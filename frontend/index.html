@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistema Inventario SENA SENNOVA CEAI</title>
+    <link rel="stylesheet" href="/static/css/styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+</head>
+<body>
+    <header class="header">
+        <div class="header-content">
+            <div class="logo-section">
+                <img src="/static/images/logo-sena.png" alt="SENA" class="logo">
+                <div class="header-text">
+                    <h1>Sistema de Inventario de Activos</h1>
+                    <p class="subtitle">SENA SENNOVA CEAI - Gestión Inteligente v3.0</p>
+                </div>
+            </div>
+            <div class="header-actions">
+                <button class="btn-icon" title="Notificaciones">
+                    <i class="fas fa-bell"></i>
+                </button>
+                <button class="btn-icon" title="Usuario">
+                    <i class="fas fa-user-circle"></i>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <main class="container">
+        <!-- Estadísticas rápidas -->
+        <section class="stats-section">
+            <div class="stat-card">
+                <div class="stat-icon blue">
+                    <i class="fas fa-box"></i>
+                </div>
+                <div class="stat-content">
+                    <h3 id="totalActivos">0</h3>
+                    <p>Total Activos</p>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon green">
+                    <i class="fas fa-check-circle"></i>
+                </div>
+                <div class="stat-content">
+                    <h3 id="activosDisponibles">0</h3>
+                    <p>Disponibles</p>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon orange">
+                    <i class="fas fa-user-tag"></i>
+                </div>
+                <div class="stat-content">
+                    <h3 id="totalResponsables">0</h3>
+                    <p>Responsables</p>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon purple">
+                    <i class="fas fa-map-marker-alt"></i>
+                </div>
+                <div class="stat-content">
+                    <h3 id="totalUbicaciones">0</h3>
+                    <p>Ubicaciones</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Sección de Búsqueda -->
+        <section class="search-section">
+            <div class="section-header">
+                <h2><i class="fas fa-search"></i> Búsqueda y Filtros</h2>
+                <button class="btn btn-create" onclick="mostrarModalCrear()">
+                    <i class="fas fa-plus"></i> Agregar Nuevo Activo
+                </button>
+            </div>
+            
+            <div class="search-filters">
+                <div class="filter-group">
+                    <label><i class="fas fa-barcode"></i> Placa</label>
+                    <input type="text" id="searchPlaca" placeholder="Número de placa">
+                </div>
+                <div class="filter-group">
+                    <label><i class="fas fa-hashtag"></i> Consecutivo</label>
+                    <input type="text" id="searchConsecutivo" placeholder="Consecutivo">
+                </div>
+                <div class="filter-group">
+                    <label><i class="fas fa-user"></i> Responsable</label>
+                    <select id="searchResponsable">
+                        <option value="">Todos los responsables</option>
+                    </select>
+                </div>
+                <div class="filter-group">
+                    <label><i class="fas fa-map-marker"></i> Ubicación</label>
+                    <select id="searchUbicacion">
+                        <option value="">Todas las ubicaciones</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="search-actions">
+                <button class="btn btn-primary" onclick="buscarActivos()">
+                    <i class="fas fa-search"></i> Buscar
+                </button>
+                <button class="btn btn-secondary" onclick="limpiarFiltros()">
+                    <i class="fas fa-eraser"></i> Limpiar
+                </button>
+                <button class="btn btn-success" onclick="exportarCSV()">
+                    <i class="fas fa-file-excel"></i> Exportar CSV
+                </button>
+            </div>
+        </section>
+
+        <!-- Tabla de Resultados -->
+        <section class="results-section">
+            <div class="results-header">
+                <h2><i class="fas fa-table"></i> Inventario de Activos</h2>
+                <div class="results-info">
+                    <span class="results-count" id="resultsCount">Mostrando 0 de 0 activos</span>
+                </div>
+            </div>
+
+            <div class="table-container">
+                <table class="inventory-table">
+                    <thead>
+                        <tr>
+                            <th>Placa</th>
+                            <th>Consecutivo</th>
+                            <th>Descripción</th>
+                            <th>Modelo</th>
+                            <th>Responsable</th>
+                            <th>Ubicación</th>
+                            <th>Estado</th>
+                            <th class="text-center">Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody id="inventoryTableBody">
+                        <tr class="empty-state">
+                            <td colspan="8">
+                                <div class="empty-message">
+                                    <i class="fas fa-inbox"></i>
+                                    <p>No hay registros para mostrar</p>
+                                    <button class="btn btn-primary" onclick="mostrarModalCrear()">
+                                        <i class="fas fa-plus"></i> Crear primer activo
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="pagination" id="pagination"></div>
+        </section>
+    </main>
+
+    <!-- Modal Crear/Editar -->
+    <div id="modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="modalTitle"><i class="fas fa-plus-circle"></i> Nuevo Activo</h2>
+                <span class="close" onclick="cerrarModal()">
+                    <i class="fas fa-times"></i>
+                </span>
+            </div>
+            
+            <form id="activoForm" enctype="multipart/form-data">
+                <input type="hidden" id="activoId">
+                
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label><i class="fas fa-barcode"></i> Placa *</label>
+                        <input type="text" id="placa" required placeholder="Ej: 121323">
+                    </div>
+
+                    <div class="form-group">
+                        <label><i class="fas fa-hashtag"></i> Consecutivo</label>
+                        <input type="text" id="consecutivo" placeholder="Ej: 001, 002...">
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label><i class="fas fa-align-left"></i> Descripción *</label>
+                    <textarea id="descripcion" rows="3" required placeholder="Descripción detallada del activo"></textarea>
+                </div>
+
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label><i class="fas fa-cube"></i> Modelo</label>
+                        <input type="text" id="modelo" placeholder="Ej: HP ProBook 450">
+                    </div>
+
+                    <div class="form-group">
+                        <label><i class="fas fa-user"></i> Responsable *</label>
+                        <input type="text" id="responsable" required placeholder="Nombre completo">
+                    </div>
+                </div>
+
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label><i class="fas fa-id-card"></i> Cédula del Responsable</label>
+                        <input type="text" id="cedulaResponsable" placeholder="Ej: 1234567890">
+                    </div>
+
+                    <div class="form-group">
+                        <label><i class="fas fa-map-marker-alt"></i> Ubicación</label>
+                        <input type="text" id="ubicacion" placeholder="Ej: Sala de Informática">
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label><i class="fas fa-images"></i> Imágenes del Activo</label>
+                    <div class="file-input-wrapper">
+                        <input type="file" id="imagenes" multiple accept="image/*" class="file-input">
+                        <label for="imagenes" class="file-label">
+                            <i class="fas fa-cloud-upload-alt"></i>
+                            <span>Arrastra imágenes o haz clic para seleccionar</span>
+                        </label>
+                    </div>
+                    <small class="form-hint">Puedes seleccionar múltiples imágenes (JPG, PNG)</small>
+                </div>
+
+                <div id="imagenesPreview" class="imagenes-preview"></div>
+
+                <div class="form-actions">
+                    <button type="button" class="btn btn-secondary" onclick="cerrarModal()">
+                        <i class="fas fa-times"></i> Cancelar
+                    </button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-save"></i> Guardar Activo
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal Ver Detalles -->
+    <div id="modalVer" class="modal">
+        <div class="modal-content modal-large">
+            <div class="modal-header">
+                <h2><i class="fas fa-info-circle"></i> Detalles del Activo</h2>
+                <span class="close" onclick="cerrarModalVer()">
+                    <i class="fas fa-times"></i>
+                </span>
+            </div>
+            <div id="detalleContent" class="detail-content"></div>
+        </div>
+    </div>
+
+    <script src="/static/js/app.js"></script>
+</body>
+</html>

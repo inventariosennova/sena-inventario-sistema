@@ -11,10 +11,10 @@
     <header class="header">
         <div class="header-content">
             <div class="logo-section">
-                <img src="/static/images/logo-sena.png" alt="SENA" class="logo">
+                <img src="https://i.postimg.cc/cHpqyBX5/Logo-sena.jpg" alt="SENA" class="logo">
                 <div class="header-text">
-                    <h1>Sistema de Inventario de Activos</h1>
-                    <p class="subtitle">SENA SENNOVA CEAI - Gestión Inteligente v3.0</p>
+                    <h1>Sistema Inventario de Activos</h1>
+                    <p class="subtitle">SENA SENNOVA CEAI - Gestión de inventario v3.0</p>
                 </div>
             </div>
             <div class="header-actions">
@@ -84,8 +84,8 @@
                     <input type="text" id="searchPlaca" placeholder="Número de placa">
                 </div>
                 <div class="filter-group">
-                    <label><i class="fas fa-hashtag"></i> Consecutivo</label>
-                    <input type="text" id="searchConsecutivo" placeholder="Consecutivo">
+                    <label><i class="fas fa-id-card"></i> Cédula</label>
+                    <input type="text" id="searchCedula" placeholder="Número de cédula">
                 </div>
                 <div class="filter-group">
                     <label><i class="fas fa-user"></i> Responsable</label>
@@ -128,7 +128,6 @@
                     <thead>
                         <tr>
                             <th>Placa</th>
-                            <th>Consecutivo</th>
                             <th>Descripción</th>
                             <th>Modelo</th>
                             <th>Responsable</th>
@@ -139,7 +138,7 @@
                     </thead>
                     <tbody id="inventoryTableBody">
                         <tr class="empty-state">
-                            <td colspan="8">
+                            <td colspan="7">
                                 <div class="empty-message">
                                     <i class="fas fa-inbox"></i>
                                     <p>No hay registros para mostrar</p>
@@ -170,16 +169,9 @@
             <form id="activoForm" enctype="multipart/form-data">
                 <input type="hidden" id="activoId">
                 
-                <div class="form-grid">
-                    <div class="form-group">
-                        <label><i class="fas fa-barcode"></i> Placa *</label>
-                        <input type="text" id="placa" required placeholder="Ej: 121323">
-                    </div>
-
-                    <div class="form-group">
-                        <label><i class="fas fa-hashtag"></i> Consecutivo</label>
-                        <input type="text" id="consecutivo" placeholder="Ej: 001, 002...">
-                    </div>
+                <div class="form-group">
+                    <label><i class="fas fa-barcode"></i> Placa *</label>
+                    <input type="text" id="placa" required placeholder="Ej: 121323">
                 </div>
 
                 <div class="form-group">

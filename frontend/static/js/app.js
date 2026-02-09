@@ -20,9 +20,6 @@ async function cargarActivos(filtros = {}) {
         if (filtros.placa) {
             url += `placa=${encodeURIComponent(filtros.placa)}&`;
         }
-        if (filtros.consecutivo) {
-            url += `consecutivo=${encodeURIComponent(filtros.consecutivo)}&`;
-        }
         if (filtros.cedula) {
             url += `cedula=${encodeURIComponent(filtros.cedula)}&`;
         }
@@ -47,14 +44,14 @@ async function cargarActivos(filtros = {}) {
     }
 }
 
-// Renderizar tabla con los nuevos campos
+// Renderizar tabla SIN consecutivo
 function renderizarTabla(datos) {
     const tbody = document.getElementById('inventoryTableBody');
     
     if (datos.length === 0) {
         tbody.innerHTML = `
             <tr class="empty-state">
-                <td colspan="8">
+                <td colspan="7">
                     <div class="empty-message">
                         <i class="fas fa-inbox"></i>
                         <p>No se encontraron registros</p>
@@ -68,7 +65,6 @@ function renderizarTabla(datos) {
     tbody.innerHTML = datos.map(activo => `
         <tr>
             <td><strong>${activo.placa}</strong></td>
-            <td>${activo.consecutivo || '-'}</td>
             <td>${activo.descripcion}</td>
             <td>${activo.modelo || '-'}</td>
             <td>
@@ -156,24 +152,26 @@ async function cargarUbicaciones() {
     }
 }
 
-// Buscar activos con filtros
+// ✅ FUNCIÓN ACTUALIZADA: Buscar activos con filtros (INCLUYE CÉDULA)
 function buscarActivos() {
     const placa = document.getElementById('searchPlaca').value;
-    const consecutivo = document.getElementById('searchConsecutivo').value;
+    const cedula = document.getElementById('searchCedula').value;
     const responsable = document.getElementById('searchResponsable').value;
+    const ubicacion = document.getElementById('searchUbicacion').value;
     
     const filtros = {};
     if (placa) filtros.placa = placa;
-    if (consecutivo) filtros.consecutivo = consecutivo;
+    if (cedula) filtros.cedula = cedula;
     if (responsable) filtros.responsable = responsable;
+    if (ubicacion) filtros.ubicacion = ubicacion;
     
     cargarActivos(filtros);
 }
 
-// Limpiar filtros
+// ✅ FUNCIÓN ACTUALIZADA: Limpiar filtros (INCLUYE CÉDULA)
 function limpiarFiltros() {
     document.getElementById('searchPlaca').value = '';
-    document.getElementById('searchConsecutivo').value = '';
+    document.getElementById('searchCedula').value = '';
     document.getElementById('searchResponsable').value = '';
     if (document.getElementById('searchUbicacion')) {
         document.getElementById('searchUbicacion').value = '';
@@ -181,17 +179,16 @@ function limpiarFiltros() {
     cargarActivos();
 }
 
-// Exportar a CSV con nuevos campos
+// Exportar a CSV (SIN consecutivo)
 function exportarCSV() {
     if (activos.length === 0) {
         alert('No hay datos para exportar');
         return;
     }
     
-    const headers = ['Placa', 'Consecutivo', 'Descripción', 'Modelo', 'Responsable', 'Cédula', 'Ubicación', 'Fecha Creación'];
+    const headers = ['Placa', 'Descripción', 'Modelo', 'Responsable', 'Cédula', 'Ubicación', 'Fecha Creación'];
     const rows = activos.map(a => [
         a.placa,
-        a.consecutivo || '',
         a.descripcion,
         a.modelo || '',
         a.responsable,
@@ -222,7 +219,7 @@ function mostrarModalCrear() {
     document.getElementById('modal').style.display = 'block';
 }
 
-// Ver detalles del activo
+// Ver detalles del activo (SIN consecutivo)
 async function verActivo(id) {
     try {
         const response = await fetch(`${API_URL}/activos/${id}`);
@@ -239,10 +236,6 @@ async function verActivo(id) {
                 <div class="detail-row">
                     <strong><i class="fas fa-barcode"></i> Placa:</strong> 
                     <span>${activo.placa}</span>
-                </div>
-                <div class="detail-row">
-                    <strong><i class="fas fa-hashtag"></i> Consecutivo:</strong> 
-                    <span>${activo.consecutivo || 'N/A'}</span>
                 </div>
                 <div class="detail-row">
                     <strong><i class="fas fa-align-left"></i> Descripción:</strong> 
@@ -285,7 +278,7 @@ async function verActivo(id) {
     }
 }
 
-// Editar activo con nuevos campos
+// Editar activo (SIN consecutivo)
 async function editarActivo(id) {
     try {
         const response = await fetch(`${API_URL}/activos/${id}`);
@@ -296,7 +289,6 @@ async function editarActivo(id) {
         document.getElementById('modalTitle').innerHTML = '<i class="fas fa-edit"></i> Editar Activo';
         document.getElementById('activoId').value = activo.id;
         document.getElementById('placa').value = activo.placa;
-        document.getElementById('consecutivo').value = activo.consecutivo || '';
         document.getElementById('descripcion').value = activo.descripcion;
         document.getElementById('modelo').value = activo.modelo || '';
         document.getElementById('responsable').value = activo.responsable;
@@ -341,7 +333,7 @@ window.onclick = function(event) {
     }
 }
 
-// Manejar envío del formulario con nuevos campos
+// Manejar envío del formulario (SIN consecutivo)
 document.getElementById('activoForm').addEventListener('submit', async (e) => {
     e.preventDefault();
     
@@ -349,7 +341,6 @@ document.getElementById('activoForm').addEventListener('submit', async (e) => {
     const formData = new FormData();
     
     formData.append('placa', document.getElementById('placa').value);
-    formData.append('consecutivo', document.getElementById('consecutivo').value);
     formData.append('descripcion', document.getElementById('descripcion').value);
     formData.append('modelo', document.getElementById('modelo').value);
     formData.append('responsable', document.getElementById('responsable').value);

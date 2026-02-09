@@ -65,8 +65,12 @@ body {
 .logo {
     height: 50px;
     width: auto;
-    filter: brightness(0) invert(1);
+    object-fit: contain;
+    background: white;
+    padding: 0.25rem;
+    border-radius: 4px;
 }
+
 
 .header-text h1 {
     font-size: 1.5rem;
@@ -830,3 +834,4 @@ form {
         font-size: 0.875rem;
     }
 }
+

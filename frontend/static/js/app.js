@@ -1,5 +1,6 @@
 // Configuración API
-const API_URL = 'http://localhost:8000/api';
+const API_URL = 'https://sena-inventario-backend.onrender.com/api';
+
 
 // Variables globales
 let activos = [];

@@ -1,11 +1,52 @@
 # Python
 __pycache__/
 *.py[cod]
+*$py.class
+*.so
+.Python
+
+# Virtual Environment
 venv/
 env/
+ENV/
+.venv
+
+# Environment variables
 .env
+.env.local
+.env.production
+*.env
+
+# Database
 *.db
+*.sqlite3
+*.sql
 
 # Uploads
-uploads/
+uploads/*
+!uploads/.gitkeep
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*.code-workspace
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Firebase
+firebase-credentials.json
+*-firebase-*.json
+
+# Logs
 *.log
+logs/
+
+# Build
+dist/
+build/
+*.egg-info/

@@ -9,6 +9,13 @@ let fotosCamara = [];
 let imagenesExistentes = [];
 let imagenesNuevas = [];
 
+// Paginación básica en frontend
+const PAGE_SIZE = 10;
+let paginaActivos = 1;
+let paginaHistorial = 1;
+let historialActual = []; // último historial cargado
+let tituloHistorialActual = '';
+
 function iniciarApp() {
     cargarActivos();
     cargarResponsables();
@@ -66,6 +73,7 @@ async function cargarActivos(filtros = {}) {
         const data = await response.json();
         
         activos = data.activos;
+        paginaActivos = 1;
         renderizarTabla(activos);
         actualizarContador(data.total);
         
@@ -76,11 +84,13 @@ async function cargarActivos(filtros = {}) {
     }
 }
 
-// Renderizar tabla SIN consecutivo
+// Renderizar tabla con paginación
 function renderizarTabla(datos) {
     const tbody = document.getElementById('inventoryTableBody');
+    const paginationDiv = document.getElementById('pagination');
     
     if (datos.length === 0) {
+        if (paginationDiv) paginationDiv.innerHTML = '';
         tbody.innerHTML = `
             <tr class="empty-state">
                 <td colspan="6">
@@ -93,8 +103,12 @@ function renderizarTabla(datos) {
         `;
         return;
     }
+
+    const start = 0;
+    const end = paginaActivos * PAGE_SIZE;
+    const visibles = datos.slice(start, end);
     
-    tbody.innerHTML = datos.map(activo => {
+    tbody.innerHTML = visibles.map(activo => {
         const desc = activo.descripcion || '';
         const descripcionCorta = desc.length > 80 ? desc.substring(0, 80) + '…' : desc;
         return `
@@ -119,12 +133,27 @@ function renderizarTabla(datos) {
             </td>
         </tr>`;
     }).join('');
+
+    if (paginationDiv) {
+        if (datos.length > end) {
+            paginationDiv.innerHTML = `
+                <button class="btn btn-secondary" onclick="verMasActivos()">Ver más</button>
+            `;
+        } else {
+            paginationDiv.innerHTML = '';
+        }
+    }
+}
+
+function verMasActivos() {
+    paginaActivos += 1;
+    renderizarTabla(activos);
 }
 
 // Actualizar contador
 function actualizarContador(total) {
     const countElement = document.getElementById('resultsCount');
-    const mostrados = activos.length;
+    const mostrados = Math.min(activos.length, paginaActivos * PAGE_SIZE);
     countElement.textContent = `Mostrando ${mostrados} de ${total} activos`;
 }
 
@@ -446,7 +475,11 @@ async function mostrarHistorialGeneral() {
     try {
         const response = await fetch(`${API_URL}/historial`);
         const historial = await response.json();
-        renderizarHistorial(historial, 'Historial general de cambios');
+        historialActual = historial;
+        tituloHistorialActual = 'Historial general de cambios';
+        paginaHistorial = 1;
+        renderizarHistorialPagina();
+        document.getElementById('modalHistorial').style.display = 'block';
     } catch (error) {
         console.error('Error cargando historial general:', error);
         mostrarError('Error al cargar el historial general');
@@ -458,19 +491,28 @@ async function mostrarHistorialPorActivo(id, placa) {
     try {
         const response = await fetch(`${API_URL}/activos/${id}/historial`);
         const historial = await response.json();
-        renderizarHistorial(historial, `Historial de la placa ${placa}`);
+        historialActual = historial;
+        tituloHistorialActual = `Historial de la placa ${placa}`;
+        paginaHistorial = 1;
+        renderizarHistorialPagina();
+        document.getElementById('modalHistorial').style.display = 'block';
     } catch (error) {
         console.error('Error cargando historial del activo:', error);
         mostrarError('Error al cargar el historial del activo');
     }
 }
 
-function renderizarHistorial(items, titulo) {
+function renderizarHistorialPagina() {
     const cont = document.getElementById('historialContent');
-    if (!items || items.length === 0) {
-        cont.innerHTML = `<p>No hay registros de historial para mostrar.</p>`;
-    } else {
-        const filas = items.map(h => `
+    if (!historialActual || historialActual.length === 0) {
+        cont.innerHTML = '<p>No hay registros de historial para mostrar.</p>';
+        return;
+    }
+
+    const end = paginaHistorial * PAGE_SIZE;
+    const visibles = historialActual.slice(0, end);
+
+    const filas = visibles.map(h => `
             <tr>
                 <td>${h.placa || ''}</td>
                 <td>${h.responsable}</td>
@@ -479,9 +521,14 @@ function renderizarHistorial(items, titulo) {
                 <td>${h.fecha_cambio ? new Date(h.fecha_cambio).toLocaleString('es-CO') : ''}</td>
             </tr>
         `).join('');
-        cont.innerHTML = `
-            <h3 style="margin-bottom: 1rem;">${titulo}</h3>
-            <div class="table-container">
+
+    const botonVerMas = historialActual.length > end
+        ? '<div style="margin-top:1rem; text-align:center;"><button class="btn btn-secondary" onclick="verMasHistorial()">Ver más</button></div>'
+        : '';
+
+    cont.innerHTML = `
+            <h3 style="margin-bottom: 1rem;">${tituloHistorialActual}</h3>
+            <div class="table-container" style="max-height: 60vh; overflow-y: auto;">
                 <table class="inventory-table">
                     <thead>
                         <tr>
@@ -497,9 +544,13 @@ function renderizarHistorial(items, titulo) {
                     </tbody>
                 </table>
             </div>
+            ${botonVerMas}
         `;
-    }
-    document.getElementById('modalHistorial').style.display = 'block';
+}
+
+function verMasHistorial() {
+    paginaHistorial += 1;
+    renderizarHistorialPagina();
 }
 
 // Preview de imágenes al seleccionar

@@ -13,21 +13,53 @@ from fastapi.responses import StreamingResponse
 import io
 import pandas as pd
 import json
+import cloudinary
+import cloudinary.uploader
 
 load_dotenv()
 
+# ✅ CONFIGURAR CLOUDINARY
+cloudinary.config(
+    cloud_name=os.getenv("CLOUDINARY_CLOUD_NAME"),
+    api_key=os.getenv("CLOUDINARY_API_KEY"),
+    api_secret=os.getenv("CLOUDINARY_API_SECRET")
+)
+
 router = APIRouter(prefix="/api", tags=["inventario"])
 
-# Crear carpeta para uploads si no existe
+# Crear carpeta para uploads si no existe (ya no se usará pero la dejamos por compatibilidad)
 UPLOAD_DIR = Path("uploads")
 UPLOAD_DIR.mkdir(exist_ok=True)
+
+
+# ✅ FUNCIÓN PARA SUBIR A CLOUDINARY
+async def subir_imagen_cloudinary(imagen: UploadFile) -> str:
+    """Sube imagen a Cloudinary y retorna la URL pública"""
+    try:
+        # Leer contenido del archivo
+        contents = await imagen.read()
+        
+        # Subir a Cloudinary
+        result = cloudinary.uploader.upload(
+            contents,
+            folder="sena-inventario",  # Carpeta dentro de Cloudinary
+            resource_type="auto"
+        )
+        
+        # Retornar URL segura
+        return result['secure_url']
+        
+    except Exception as e:
+        print(f"Error subiendo a Cloudinary: {e}")
+        raise HTTPException(status_code=500, detail=f"Error subiendo imagen: {str(e)}")
+
 
 @router.get("/activos")
 async def get_activos(
     placa: Optional[str] = None,
     responsable: Optional[str] = None,
     cedula: Optional[str] = None,
-    ubicacion: Optional[str] = None,  # ✅ AGREGAR ESTE PARÁMETRO
+    ubicacion: Optional[str] = None,
     skip: int = 0,
     limit: int = 50,
     db: Session = Depends(get_db)
@@ -40,7 +72,7 @@ async def get_activos(
         query = query.filter(Activo.responsable.contains(responsable))
     if cedula:
         query = query.filter(Activo.cedula_responsable.contains(cedula))
-    if ubicacion:  # ✅ AGREGAR ESTE FILTRO
+    if ubicacion:
         query = query.filter(Activo.ubicacion.contains(ubicacion))
     
     activos = query.offset(skip).limit(limit).all()
@@ -50,12 +82,14 @@ async def get_activos(
         "activos": activos
     }
 
+
 @router.get("/activos/{activo_id}")
 async def get_activo(activo_id: int, db: Session = Depends(get_db)):
     activo = db.query(Activo).filter(Activo.id == activo_id).first()
     if not activo:
         raise HTTPException(status_code=404, detail="Activo no encontrado")
     return activo
+
 
 @router.post("/activos")
 async def create_activo(
@@ -73,18 +107,12 @@ async def create_activo(
     if existing:
         raise HTTPException(status_code=400, detail="La placa ya existe")
     
-    # Guardar imágenes localmente
+    # ✅ SUBIR IMÁGENES A CLOUDINARY (en lugar de guardar localmente)
     imagen_urls = []
     for imagen in imagenes:
         if imagen.filename:
-            file_extension = Path(imagen.filename).suffix
-            unique_filename = f"{uuid.uuid4()}{file_extension}"
-            file_path = UPLOAD_DIR / unique_filename
-            
-            with file_path.open("wb") as buffer:
-                shutil.copyfileobj(imagen.file, buffer)
-            
-            imagen_urls.append(f"/uploads/{unique_filename}")
+            url = await subir_imagen_cloudinary(imagen)
+            imagen_urls.append(url)
     
     # Crear activo
     nuevo_activo = Activo(
@@ -94,7 +122,7 @@ async def create_activo(
         responsable=responsable,
         cedula_responsable=cedula_responsable,
         ubicacion=ubicacion,
-        imagenes=imagen_urls
+        imagenes=imagen_urls  # URLs de Cloudinary
     )
     
     db.add(nuevo_activo)
@@ -114,6 +142,7 @@ async def create_activo(
     
     return nuevo_activo
 
+
 @router.put("/activos/{activo_id}")
 async def update_activo(
     activo_id: int,
@@ -123,7 +152,7 @@ async def update_activo(
     responsable: Optional[str] = Form(None),
     cedula_responsable: Optional[str] = Form(None),
     ubicacion: Optional[str] = Form(None),
-    imagenes_existentes: Optional[str] = Form(None),  # JSON con URLs que se deben mantener
+    imagenes_existentes: Optional[str] = Form(None),
     imagenes: List[UploadFile] = File([]),
     db: Session = Depends(get_db)
 ):
@@ -139,10 +168,9 @@ async def update_activo(
     if cedula_responsable: activo.cedula_responsable = cedula_responsable
     if ubicacion: activo.ubicacion = ubicacion
 
-    # Actualizar lista de imágenes existentes (mantener solo las recibidas)
+    # Actualizar lista de imágenes existentes
     if imagenes_existentes is not None:
         try:
-            import json
             urls_mantener = json.loads(imagenes_existentes)
             if not isinstance(urls_mantener, list):
                 urls_mantener = []
@@ -154,20 +182,14 @@ async def update_activo(
 
     cambios_descritos = "Actualización de activo"
     
-    # Guardar nuevas imágenes
+    # ✅ SUBIR NUEVAS IMÁGENES A CLOUDINARY
     if imagenes and imagenes[0].filename:
         if not activo.imagenes:
             activo.imagenes = []
             
         for imagen in imagenes:
-            file_extension = Path(imagen.filename).suffix
-            unique_filename = f"{uuid.uuid4()}{file_extension}"
-            file_path = UPLOAD_DIR / unique_filename
-            
-            with file_path.open("wb") as buffer:
-                shutil.copyfileobj(imagen.file, buffer)
-            
-            activo.imagenes.append(f"/uploads/{unique_filename}")
+            url = await subir_imagen_cloudinary(imagen)
+            activo.imagenes.append(url)
     
     db.commit()
     db.refresh(activo)
@@ -185,6 +207,7 @@ async def update_activo(
     
     return activo
 
+
 @router.get("/activos/{activo_id}/historial")
 async def get_historial_activo(activo_id: int, db: Session = Depends(get_db)):
     historial = (
@@ -194,6 +217,7 @@ async def get_historial_activo(activo_id: int, db: Session = Depends(get_db)):
         .all()
     )
     return historial
+
 
 @router.get("/historial")
 async def get_historial_general(db: Session = Depends(get_db)):
@@ -205,17 +229,16 @@ async def get_historial_general(db: Session = Depends(get_db)):
     )
     return historial
 
+
 @router.get("/exportar/excel")
 async def exportar_excel(request: Request, db: Session = Depends(get_db)):
     activos = db.query(Activo).all()
-    base_url = str(request.base_url).rstrip("/")
     data = []
     for a in activos:
         fecha_creacion = a.created_at.strftime("%Y-%m-%d %H:%M:%S") if a.created_at else ""
-        # Construir URLs absolutas para las imágenes
+        # Las imágenes ya son URLs completas de Cloudinary
         if a.imagenes:
-            imagenes_urls = [f"{base_url}{path}" for path in a.imagenes]
-            imagenes_str = "; ".join(imagenes_urls)
+            imagenes_str = "; ".join(a.imagenes)
         else:
             imagenes_str = ""
         data.append({
@@ -238,6 +261,7 @@ async def exportar_excel(request: Request, db: Session = Depends(get_db)):
         "Content-Disposition": "attachment; filename=activos_sena.xlsx"
     }
     return StreamingResponse(output, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", headers=headers)
+
 
 @router.delete("/activos/{activo_id}")
 async def delete_activo(activo_id: int, db: Session = Depends(get_db)):

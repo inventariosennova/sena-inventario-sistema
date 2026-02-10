@@ -36,11 +36,11 @@ async function cargarActivos(filtros = {}) {
         activos = data.activos;
         renderizarTabla(activos);
         actualizarContador(data.total);
-        actualizarEstadisticas(data.activos);
         
     } catch (error) {
         console.error('Error cargando activos:', error);
-        mostrarError('Error al cargar los datos del inventario');
+        const detalle = (error && error.message) ? `: ${error.message}` : '';
+        mostrarError('Error al cargar los datos del inventario' + detalle);
     }
 }
 
@@ -51,7 +51,7 @@ function renderizarTabla(datos) {
     if (datos.length === 0) {
         tbody.innerHTML = `
             <tr class="empty-state">
-                <td colspan="7">
+                <td colspan="6">
                     <div class="empty-message">
                         <i class="fas fa-inbox"></i>
                         <p>No se encontraron registros</p>
@@ -74,11 +74,6 @@ function renderizarTabla(datos) {
                 </div>
             </td>
             <td>${activo.ubicacion || '-'}</td>
-            <td>
-                <span class="badge badge-success">
-                    <i class="fas fa-check-circle"></i> Activo
-                </span>
-            </td>
             <td class="actions">
                 <button class="btn btn-view" onclick="verActivo(${activo.id})" title="Ver detalles">
                     <i class="fas fa-eye"></i>
@@ -88,7 +83,7 @@ function renderizarTabla(datos) {
                 </button>
             </td>
         </tr>
-    `).join('');
+    `).join('').replace(/<span class=\"badge[^>]*>[^<]*<\/span>/g, '');
 }
 
 // Actualizar contador
@@ -98,17 +93,7 @@ function actualizarContador(total) {
     countElement.textContent = `Mostrando ${mostrados} de ${total} activos`;
 }
 
-// Actualizar estadísticas
-function actualizarEstadisticas(datos) {
-    document.getElementById('totalActivos').textContent = datos.length;
-    document.getElementById('activosDisponibles').textContent = datos.length;
-    
-    const responsablesUnicos = [...new Set(datos.map(a => a.responsable))].length;
-    document.getElementById('totalResponsables').textContent = responsablesUnicos;
-    
-    const ubicacionesUnicas = [...new Set(datos.map(a => a.ubicacion).filter(u => u))].length;
-    document.getElementById('totalUbicaciones').textContent = ubicacionesUnicas;
-}
+// (Eliminado) Actualización de estadísticas: ya no se muestran tarjetas
 
 // Cargar responsables únicos para el filtro
 async function cargarResponsables() {

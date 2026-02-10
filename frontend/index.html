@@ -29,46 +29,6 @@
     </header>
 
     <main class="container">
-        <!-- Estadísticas rápidas -->
-        <section class="stats-section">
-            <div class="stat-card">
-                <div class="stat-icon blue">
-                    <i class="fas fa-box"></i>
-                </div>
-                <div class="stat-content">
-                    <h3 id="totalActivos">0</h3>
-                    <p>Total Activos</p>
-                </div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-icon green">
-                    <i class="fas fa-check-circle"></i>
-                </div>
-                <div class="stat-content">
-                    <h3 id="activosDisponibles">0</h3>
-                    <p>Disponibles</p>
-                </div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-icon orange">
-                    <i class="fas fa-user-tag"></i>
-                </div>
-                <div class="stat-content">
-                    <h3 id="totalResponsables">0</h3>
-                    <p>Responsables</p>
-                </div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-icon purple">
-                    <i class="fas fa-map-marker-alt"></i>
-                </div>
-                <div class="stat-content">
-                    <h3 id="totalUbicaciones">0</h3>
-                    <p>Ubicaciones</p>
-                </div>
-            </div>
-        </section>
-
         <!-- Sección de Búsqueda -->
         <section class="search-section">
             <div class="section-header">
@@ -132,13 +92,12 @@
                             <th>Modelo</th>
                             <th>Responsable</th>
                             <th>Ubicación</th>
-                            <th>Estado</th>
                             <th class="text-center">Acciones</th>
                         </tr>
                     </thead>
                     <tbody id="inventoryTableBody">
                         <tr class="empty-state">
-                            <td colspan="7">
+                            <td colspan="6">
                                 <div class="empty-message">
                                     <i class="fas fa-inbox"></i>
                                     <p>No hay registros para mostrar</p>
@@ -242,6 +201,6 @@
         </div>
     </div>
 
-    <script src="/static/js/app.js"></script>
+    <script src="/static/js/app.js?v=2"></script>
 </body>
 </html>

@@ -145,7 +145,6 @@ function renderizarTabla(datos) {
         }
     }
 }
-
 function verMasActivos() {
     paginaActivos += 1;
     renderizarTabla(activos);

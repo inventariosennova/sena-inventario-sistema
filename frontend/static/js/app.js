@@ -1,5 +1,5 @@
 // Configuración API
-const API_URL = 'https://sena-inventario-backend.onrender.com/api';
+const API_URL = 'https://sena-inventario-sistema.onrender.com/api';
 
 
 // Variables globales

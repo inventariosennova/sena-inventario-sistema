@@ -408,6 +408,14 @@ body {
     font-size: 0.95rem;
 }
 
+/* Columna descripción truncada */
+.descripcion-col {
+    max-width: 260px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
 .inventory-table tbody tr {
     transition: var(--transition);
 }
@@ -657,6 +665,15 @@ form {
     font-size: 0.95rem;
 }
 
+.camera-actions {
+    margin-top: 0.75rem;
+}
+
+.camera-actions .btn {
+    padding: 0.5rem 1rem;
+    font-size: 0.9rem;
+}
+
 .form-actions {
     display: flex;
     gap: 1rem;
@@ -682,6 +699,32 @@ form {
     transition: var(--transition);
 }
 
+/* Contenedor de miniaturas de imágenes */
+.preview-item {
+    position: relative;
+}
+
+.btn-mini-delete {
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    border: none;
+    background: rgba(0, 0, 0, 0.75);
+    color: #fff;
+    border-radius: 50%;
+    width: 22px;
+    height: 22px;
+    cursor: pointer;
+    font-size: 13px;
+    line-height: 22px;
+    text-align: center;
+    box-shadow: 0 0 4px rgba(0,0,0,0.4);
+}
+
+.btn-mini-delete:hover {
+    background: #ff1744;
+}
+
 .imagenes-preview img:hover {
     transform: scale(1.05);
     box-shadow: var(--shadow-md);
@@ -690,6 +733,15 @@ form {
 /* Detail Content */
 .detail-content {
     padding: 2rem;
+}
+
+/* Ajustes para textos largos en el modal de detalles */
+.detail-row span {
+    display: inline-block;
+    max-width: 100%;
+    word-wrap: break-word;
+    word-break: break-word;
+    white-space: normal;
 }
 
 /* Pagination */

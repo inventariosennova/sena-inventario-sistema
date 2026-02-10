@@ -1,13 +1,18 @@
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, Request
 from sqlalchemy.orm import Session
 from typing import List, Optional
 from app.database.database import get_db
 from app.models.activo import Activo
+from app.models.historial import HistorialCambio
 import os
 from pathlib import Path
 import shutil
 import uuid
 from dotenv import load_dotenv
+from fastapi.responses import StreamingResponse
+import io
+import pandas as pd
+import json
 
 load_dotenv()
 
@@ -95,6 +100,17 @@ async def create_activo(
     db.add(nuevo_activo)
     db.commit()
     db.refresh(nuevo_activo)
+
+    # Registrar historial de creación
+    historial = HistorialCambio(
+        activo_id=nuevo_activo.id,
+        placa=placa,
+        responsable=responsable,
+        accion="creado",
+        descripcion_cambio=f"Creación del activo con placa {placa}"
+    )
+    db.add(historial)
+    db.commit()
     
     return nuevo_activo
 
@@ -107,6 +123,7 @@ async def update_activo(
     responsable: Optional[str] = Form(None),
     cedula_responsable: Optional[str] = Form(None),
     ubicacion: Optional[str] = Form(None),
+    imagenes_existentes: Optional[str] = Form(None),  # JSON con URLs que se deben mantener
     imagenes: List[UploadFile] = File([]),
     db: Session = Depends(get_db)
 ):
@@ -121,6 +138,21 @@ async def update_activo(
     if responsable: activo.responsable = responsable
     if cedula_responsable: activo.cedula_responsable = cedula_responsable
     if ubicacion: activo.ubicacion = ubicacion
+
+    # Actualizar lista de imágenes existentes (mantener solo las recibidas)
+    if imagenes_existentes is not None:
+        try:
+            import json
+            urls_mantener = json.loads(imagenes_existentes)
+            if not isinstance(urls_mantener, list):
+                urls_mantener = []
+        except Exception:
+            urls_mantener = []
+        activo.imagenes = urls_mantener
+    elif not activo.imagenes:
+        activo.imagenes = []
+
+    cambios_descritos = "Actualización de activo"
     
     # Guardar nuevas imágenes
     if imagenes and imagenes[0].filename:
@@ -139,15 +171,89 @@ async def update_activo(
     
     db.commit()
     db.refresh(activo)
+
+    # Registrar historial de actualización
+    historial = HistorialCambio(
+        activo_id=activo.id,
+        placa=activo.placa,
+        responsable=activo.responsable,
+        accion="actualizado",
+        descripcion_cambio=cambios_descritos
+    )
+    db.add(historial)
+    db.commit()
     
     return activo
+
+@router.get("/activos/{activo_id}/historial")
+async def get_historial_activo(activo_id: int, db: Session = Depends(get_db)):
+    historial = (
+        db.query(HistorialCambio)
+        .filter(HistorialCambio.activo_id == activo_id)
+        .order_by(HistorialCambio.fecha_cambio.desc())
+        .all()
+    )
+    return historial
+
+@router.get("/historial")
+async def get_historial_general(db: Session = Depends(get_db)):
+    historial = (
+        db.query(HistorialCambio)
+        .order_by(HistorialCambio.fecha_cambio.desc())
+        .limit(500)
+        .all()
+    )
+    return historial
+
+@router.get("/exportar/excel")
+async def exportar_excel(request: Request, db: Session = Depends(get_db)):
+    activos = db.query(Activo).all()
+    base_url = str(request.base_url).rstrip("/")
+    data = []
+    for a in activos:
+        fecha_creacion = a.created_at.strftime("%Y-%m-%d %H:%M:%S") if a.created_at else ""
+        # Construir URLs absolutas para las imágenes
+        if a.imagenes:
+            imagenes_urls = [f"{base_url}{path}" for path in a.imagenes]
+            imagenes_str = "; ".join(imagenes_urls)
+        else:
+            imagenes_str = ""
+        data.append({
+            "Placa": a.placa,
+            "Descripción": a.descripcion,
+            "Modelo": a.modelo,
+            "Responsable": a.responsable,
+            "Cédula": a.cedula_responsable,
+            "Ubicación": a.ubicacion,
+            "Fecha Creación": fecha_creacion,
+            "Imágenes": imagenes_str
+        })
+    df = pd.DataFrame(data)
+    output = io.BytesIO()
+    with pd.ExcelWriter(output, engine="openpyxl") as writer:
+        df.to_excel(writer, index=False, sheet_name="Activos")
+    output.seek(0)
+
+    headers = {
+        "Content-Disposition": "attachment; filename=activos_sena.xlsx"
+    }
+    return StreamingResponse(output, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", headers=headers)
 
 @router.delete("/activos/{activo_id}")
 async def delete_activo(activo_id: int, db: Session = Depends(get_db)):
     activo = db.query(Activo).filter(Activo.id == activo_id).first()
     if not activo:
         raise HTTPException(status_code=404, detail="Activo no encontrado")
-    
+
+    # Registrar historial de eliminación
+    historial = HistorialCambio(
+        activo_id=activo.id,
+        placa=activo.placa,
+        responsable=activo.responsable,
+        accion="eliminado",
+        descripcion_cambio=f"Eliminación del activo con placa {activo.placa}"
+    )
+    db.add(historial)
     db.delete(activo)
     db.commit()
     

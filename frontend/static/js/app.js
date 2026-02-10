@@ -4,12 +4,44 @@ const API_URL = 'http://localhost:8000/api';
 // Variables globales
 let activos = [];
 let activoActual = null;
+let streamCamara = null;
+let fotosCamara = [];
+let imagenesExistentes = [];
+let imagenesNuevas = [];
 
-// Cargar activos al iniciar
-document.addEventListener('DOMContentLoaded', () => {
+function iniciarApp() {
     cargarActivos();
     cargarResponsables();
     cargarUbicaciones();
+}
+
+// Cargar activos al iniciar (con login previo)
+document.addEventListener('DOMContentLoaded', () => {
+    if (sessionStorage.getItem('logged') === 'true') {
+        iniciarApp();
+    } else {
+        const modalLogin = document.getElementById('modalLogin');
+        if (modalLogin) {
+            modalLogin.style.display = 'block';
+        }
+    }
+
+    const loginForm = document.getElementById('loginForm');
+    if (loginForm) {
+        loginForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const usuario = document.getElementById('loginUsuario').value.trim();
+            const password = document.getElementById('loginPassword').value.trim();
+
+            if (usuario === 'sena' && password === 'sena2026') {
+                sessionStorage.setItem('logged', 'true');
+                document.getElementById('modalLogin').style.display = 'none';
+                iniciarApp();
+            } else {
+                alert('❌ Usuario o contraseña incorrectos');
+            }
+        });
+    }
 });
 
 // Función para cargar todos los activos
@@ -62,10 +94,13 @@ function renderizarTabla(datos) {
         return;
     }
     
-    tbody.innerHTML = datos.map(activo => `
+    tbody.innerHTML = datos.map(activo => {
+        const desc = activo.descripcion || '';
+        const descripcionCorta = desc.length > 80 ? desc.substring(0, 80) + '…' : desc;
+        return `
         <tr>
             <td><strong>${activo.placa}</strong></td>
-            <td>${activo.descripcion}</td>
+            <td class="descripcion-col" title="${desc.replace(/"/g, '&quot;')}">${descripcionCorta}</td>
             <td>${activo.modelo || '-'}</td>
             <td>
                 <div class="responsable-info">
@@ -82,8 +117,8 @@ function renderizarTabla(datos) {
                     <i class="fas fa-edit"></i>
                 </button>
             </td>
-        </tr>
-    `).join('').replace(/<span class=\"badge[^>]*>[^<]*<\/span>/g, '');
+        </tr>`;
+    }).join('');
 }
 
 // Actualizar contador
@@ -92,8 +127,6 @@ function actualizarContador(total) {
     const mostrados = activos.length;
     countElement.textContent = `Mostrando ${mostrados} de ${total} activos`;
 }
-
-// (Eliminado) Actualización de estadísticas: ya no se muestran tarjetas
 
 // Cargar responsables únicos para el filtro
 async function cargarResponsables() {
@@ -137,7 +170,7 @@ async function cargarUbicaciones() {
     }
 }
 
-// ✅ FUNCIÓN ACTUALIZADA: Buscar activos con filtros (INCLUYE CÉDULA)
+// Buscar activos con filtros
 function buscarActivos() {
     const placa = document.getElementById('searchPlaca').value;
     const cedula = document.getElementById('searchCedula').value;
@@ -153,7 +186,7 @@ function buscarActivos() {
     cargarActivos(filtros);
 }
 
-// ✅ FUNCIÓN ACTUALIZADA: Limpiar filtros (INCLUYE CÉDULA)
+// Limpiar filtros
 function limpiarFiltros() {
     document.getElementById('searchPlaca').value = '';
     document.getElementById('searchCedula').value = '';
@@ -164,47 +197,43 @@ function limpiarFiltros() {
     cargarActivos();
 }
 
-// Exportar a CSV (SIN consecutivo)
-function exportarCSV() {
-    if (activos.length === 0) {
-        alert('No hay datos para exportar');
-        return;
+// Exportar a Excel usando el backend
+async function exportarExcel() {
+    try {
+        const response = await fetch(`${API_URL}/exportar/excel`);
+        if (!response.ok) {
+            throw new Error('No se pudo generar el archivo de Excel');
+        }
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'activos_sena.xlsx';
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        window.URL.revokeObjectURL(url);
+    } catch (error) {
+        console.error('Error exportando a Excel:', error);
+        mostrarError('Error al exportar a Excel');
     }
-    
-    const headers = ['Placa', 'Descripción', 'Modelo', 'Responsable', 'Cédula', 'Ubicación', 'Fecha Creación'];
-    const rows = activos.map(a => [
-        a.placa,
-        a.descripcion,
-        a.modelo || '',
-        a.responsable,
-        a.cedula_responsable || '',
-        a.ubicacion || '',
-        new Date(a.created_at).toLocaleDateString()
-    ]);
-    
-    let csvContent = headers.join(',') + '\n';
-    rows.forEach(row => {
-        csvContent += row.map(field => `"${field}"`).join(',') + '\n';
-    });
-    
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    link.href = URL.createObjectURL(blob);
-    link.download = `inventario_sena_${new Date().toISOString().split('T')[0]}.csv`;
-    link.click();
 }
 
 // Mostrar modal crear
 function mostrarModalCrear() {
     activoActual = null;
+    imagenesExistentes = [];
+    imagenesNuevas = [];
+    fotosCamara = [];
     document.getElementById('modalTitle').innerHTML = '<i class="fas fa-plus-circle"></i> Nuevo Activo';
     document.getElementById('activoForm').reset();
     document.getElementById('activoId').value = '';
     document.getElementById('imagenesPreview').innerHTML = '';
+    document.getElementById('imagenes').value = '';
     document.getElementById('modal').style.display = 'block';
 }
 
-// Ver detalles del activo (SIN consecutivo)
+// Ver detalles del activo
 async function verActivo(id) {
     try {
         const response = await fetch(`${API_URL}/activos/${id}`);
@@ -263,13 +292,16 @@ async function verActivo(id) {
     }
 }
 
-// Editar activo (SIN consecutivo)
+// Editar activo
 async function editarActivo(id) {
     try {
         const response = await fetch(`${API_URL}/activos/${id}`);
         const activo = await response.json();
         
         activoActual = activo;
+        imagenesExistentes = Array.isArray(activo.imagenes) ? [...activo.imagenes] : [];
+        imagenesNuevas = [];
+        fotosCamara = [];
         
         document.getElementById('modalTitle').innerHTML = '<i class="fas fa-edit"></i> Editar Activo';
         document.getElementById('activoId').value = activo.id;
@@ -281,12 +313,17 @@ async function editarActivo(id) {
         document.getElementById('ubicacion').value = activo.ubicacion || '';
         
         // Mostrar imágenes existentes
-        if (activo.imagenes && activo.imagenes.length > 0) {
-            const previewDiv = document.getElementById('imagenesPreview');
-            previewDiv.innerHTML = activo.imagenes.map(img => `
-                <img src="${img}" alt="Imagen">
-            `).join('');
-        }
+        const previewDiv = document.getElementById('imagenesPreview');
+        previewDiv.innerHTML = '';
+        imagenesExistentes.forEach((url, index) => {
+            const wrapper = document.createElement('div');
+            wrapper.className = 'preview-item preview-existing';
+            wrapper.innerHTML = `
+                <img src="${url}" alt="Imagen existente">
+                <button type="button" class="btn-mini-delete" data-type="existing" data-index="${index}">×</button>
+            `;
+            previewDiv.appendChild(wrapper);
+        });
         
         document.getElementById('modal').style.display = 'block';
         
@@ -305,10 +342,17 @@ function cerrarModalVer() {
     document.getElementById('modalVer').style.display = 'none';
 }
 
+function cerrarModalHistorial() {
+    document.getElementById('modalHistorial').style.display = 'none';
+}
+
 // Cerrar modal al hacer clic fuera
 window.onclick = function(event) {
     const modal = document.getElementById('modal');
     const modalVer = document.getElementById('modalVer');
+    const modalHistorial = document.getElementById('modalHistorial');
+    const modalLogin = document.getElementById('modalLogin');
+    const modalCamara = document.getElementById('modalCamara');
     
     if (event.target === modal) {
         modal.style.display = 'none';
@@ -316,9 +360,18 @@ window.onclick = function(event) {
     if (event.target === modalVer) {
         modalVer.style.display = 'none';
     }
+    if (event.target === modalHistorial) {
+        modalHistorial.style.display = 'none';
+    }
+    if (event.target === modalLogin) {
+        // No cerramos el login al hacer clic fuera para obligar autenticación
+    }
+    if (event.target === modalCamara) {
+        cerrarCamara();
+    }
 }
 
-// Manejar envío del formulario (SIN consecutivo)
+// Manejar envío del formulario
 document.getElementById('activoForm').addEventListener('submit', async (e) => {
     e.preventDefault();
     
@@ -331,11 +384,30 @@ document.getElementById('activoForm').addEventListener('submit', async (e) => {
     formData.append('responsable', document.getElementById('responsable').value);
     formData.append('cedula_responsable', document.getElementById('cedulaResponsable').value);
     formData.append('ubicacion', document.getElementById('ubicacion').value);
+
+    // En edición: enviar lista de imágenes existentes que se mantienen
+    if (activoId) {
+        const urlsExistentesVigentes = imagenesExistentes.filter(Boolean);
+        formData.append('imagenes_existentes', JSON.stringify(urlsExistentesVigentes));
+    }
     
-    // Agregar imágenes
-    const imagenesInput = document.getElementById('imagenes');
-    if (imagenesInput.files.length > 0) {
-        Array.from(imagenesInput.files).forEach(file => {
+    // Agregar imágenes nuevas desde input
+    if (imagenesNuevas.length > 0) {
+        imagenesNuevas.filter(Boolean).forEach(file => {
+            formData.append('imagenes', file);
+        });
+    } else {
+        const imagenesInput = document.getElementById('imagenes');
+        if (imagenesInput.files.length > 0) {
+            Array.from(imagenesInput.files).forEach(file => {
+                formData.append('imagenes', file);
+            });
+        }
+    }
+
+    // Agregar imágenes capturadas con la cámara
+    if (fotosCamara.length > 0) {
+        fotosCamara.filter(Boolean).forEach((file) => {
             formData.append('imagenes', file);
         });
     }
@@ -369,21 +441,166 @@ document.getElementById('activoForm').addEventListener('submit', async (e) => {
     }
 });
 
+// Historial general
+async function mostrarHistorialGeneral() {
+    try {
+        const response = await fetch(`${API_URL}/historial`);
+        const historial = await response.json();
+        renderizarHistorial(historial, 'Historial general de cambios');
+    } catch (error) {
+        console.error('Error cargando historial general:', error);
+        mostrarError('Error al cargar el historial general');
+    }
+}
+
+// Historial por activo
+async function mostrarHistorialPorActivo(id, placa) {
+    try {
+        const response = await fetch(`${API_URL}/activos/${id}/historial`);
+        const historial = await response.json();
+        renderizarHistorial(historial, `Historial de la placa ${placa}`);
+    } catch (error) {
+        console.error('Error cargando historial del activo:', error);
+        mostrarError('Error al cargar el historial del activo');
+    }
+}
+
+function renderizarHistorial(items, titulo) {
+    const cont = document.getElementById('historialContent');
+    if (!items || items.length === 0) {
+        cont.innerHTML = `<p>No hay registros de historial para mostrar.</p>`;
+    } else {
+        const filas = items.map(h => `
+            <tr>
+                <td>${h.placa || ''}</td>
+                <td>${h.responsable}</td>
+                <td>${h.accion}</td>
+                <td>${h.descripcion_cambio}</td>
+                <td>${h.fecha_cambio ? new Date(h.fecha_cambio).toLocaleString('es-CO') : ''}</td>
+            </tr>
+        `).join('');
+        cont.innerHTML = `
+            <h3 style="margin-bottom: 1rem;">${titulo}</h3>
+            <div class="table-container">
+                <table class="inventory-table">
+                    <thead>
+                        <tr>
+                            <th>Placa</th>
+                            <th>Responsable</th>
+                            <th>Acción</th>
+                            <th>Descripción cambio</th>
+                            <th>Fecha</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${filas}
+                    </tbody>
+                </table>
+            </div>
+        `;
+    }
+    document.getElementById('modalHistorial').style.display = 'block';
+}
+
 // Preview de imágenes al seleccionar
-document.getElementById('imagenes').addEventListener('change', (e) => {
-    const previewDiv = document.getElementById('imagenesPreview');
-    previewDiv.innerHTML = '';
-    
-    Array.from(e.target.files).forEach(file => {
-        const reader = new FileReader();
-        reader.onload = (event) => {
-            const img = document.createElement('img');
-            img.src = event.target.result;
-            previewDiv.appendChild(img);
-        };
-        reader.readAsDataURL(file);
+const inputImagenes = document.getElementById('imagenes');
+if (inputImagenes) {
+    inputImagenes.addEventListener('change', (e) => {
+        fotosCamara = []; // limpiar capturas previas si se seleccionan nuevas imágenes
+        imagenesNuevas = Array.from(e.target.files);
+        const previewDiv = document.getElementById('imagenesPreview');
+
+        // Eliminar solo previews de nuevas anteriores
+        Array.from(previewDiv.querySelectorAll('.preview-new')).forEach(el => el.remove());
+        
+        imagenesNuevas.forEach((file, index) => {
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                const wrapper = document.createElement('div');
+                wrapper.className = 'preview-item preview-new';
+                wrapper.innerHTML = `
+                    <img src="${event.target.result}" alt="Nueva imagen">
+                    <button type="button" class="btn-mini-delete" data-type="new" data-index="${index}">×</button>
+                `;
+                previewDiv.appendChild(wrapper);
+            };
+            reader.readAsDataURL(file);
+        });
     });
-});
+}
+
+// Manejo de eliminación en el preview de imágenes
+const previewContainer = document.getElementById('imagenesPreview');
+if (previewContainer) {
+    previewContainer.addEventListener('click', (e) => {
+        if (!e.target.classList.contains('btn-mini-delete')) return;
+        const type = e.target.getAttribute('data-type');
+        const index = parseInt(e.target.getAttribute('data-index'), 10);
+
+        if (type === 'existing') {
+            imagenesExistentes[index] = null;
+        } else if (type === 'new') {
+            imagenesNuevas[index] = null;
+        } else if (type === 'camera') {
+            fotosCamara[index] = null;
+        }
+
+        e.target.parentElement.remove();
+    });
+}
+
+// Funciones de cámara
+async function abrirCamara() {
+    try {
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+            alert('La cámara no es compatible en este navegador/dispositivo');
+            return;
+        }
+        streamCamara = await navigator.mediaDevices.getUserMedia({ video: true });
+        const video = document.getElementById('videoCamara');
+        video.srcObject = streamCamara;
+        document.getElementById('modalCamara').style.display = 'block';
+    } catch (error) {
+        console.error('Error abriendo la cámara:', error);
+        mostrarError('No se pudo acceder a la cámara');
+    }
+}
+
+function cerrarCamara() {
+    const modal = document.getElementById('modalCamara');
+    if (modal) modal.style.display = 'none';
+    if (streamCamara) {
+        streamCamara.getTracks().forEach(t => t.stop());
+        streamCamara = null;
+    }
+}
+
+function capturarFoto() {
+    const video = document.getElementById('videoCamara');
+    const canvas = document.getElementById('canvasCamara');
+    const context = canvas.getContext('2d');
+
+    canvas.width = video.videoWidth || 640;
+    canvas.height = video.videoHeight || 480;
+
+    context.drawImage(video, 0, 0, canvas.width, canvas.height);
+    canvas.toBlob((blob) => {
+        if (blob) {
+            const file = new File([blob], `foto_cam_${Date.now()}.png`, { type: 'image/png' });
+            fotosCamara.push(file);
+
+            // Mostrar preview
+            const previewDiv = document.getElementById('imagenesPreview');
+            const wrapper = document.createElement('div');
+            wrapper.className = 'preview-item preview-new';
+            wrapper.innerHTML = `
+                <img src="${URL.createObjectURL(blob)}" alt="Foto cámara">
+                <button type="button" class="btn-mini-delete" data-type="camera" data-index="${fotosCamara.length - 1}">×</button>
+            `;
+            previewDiv.appendChild(wrapper);
+        }
+    }, 'image/png');
+}
 
 // Funciones auxiliares
 function mostrarExito(mensaje) {

@@ -1,10 +1,12 @@
 # 📦 SENA Inventario Sistema
 
-**Sistema de gestión de inventario para SENA** - Aplicación web full-stack con almacenamiento permanente en la nube, desarrollada con FastAPI, React, PostgreSQL, Supabase y Cloudinary.
+**Sistema de gestión de inventario para SENA** - Aplicación web full-stack con almacenamiento permanente en la nube, desarrollada con FastAPI, HTML/CSS/JavaScript vanilla, PostgreSQL, Supabase y Cloudinary.
 
 ![Python](https://img.shields.io/badge/Python-3.10+-blue?logo=python)
 ![FastAPI](https://img.shields.io/badge/FastAPI-0.104+-green?logo=fastapi)
-![React](https://img.shields.io/badge/React-18+-61dafb?logo=react)
+![JavaScript](https://img.shields.io/badge/JavaScript-ES6+-f7df1e?logo=javascript)
+![HTML5](https://img.shields.io/badge/HTML5-Latest-e34c26?logo=html5)
+![CSS3](https://img.shields.io/badge/CSS3-Latest-1572b6?logo=css3)
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-14+-336791?logo=postgresql)
 ![Cloudinary](https://img.shields.io/badge/Cloudinary-Cloud%20Storage-blue)
 ![Render](https://img.shields.io/badge/Render-Deploy-46E3B7)
@@ -22,6 +24,7 @@
 - [Despliegue en Render](#despliegue-en-render)
 - [API Endpoints](#api-endpoints)
 - [Solución de Problemas](#solución-de-problemas)
+- [Tecnologías](#tecnologías)
 - [Contribuidores](#contribuidores)
 
 ---
@@ -57,13 +60,18 @@
 - 🛡️ Conexión encriptada
 - 📈 Escalable y confiable
 
+### 🎨 Interfaz Web
+- 📱 Diseño responsivo (HTML/CSS)
+- ⚡ JavaScript vanilla (sin dependencias externas)
+- 🌐 Compatible con navegadores modernos
+
 ---
 
 ## 🖥️ Requisitos Previos
 
 ### Sistema
 - **Python 3.10+** (para backend)
-- **Node.js 16+** (para frontend)
+- **Navegador moderno** (Chrome, Firefox, Safari, Edge)
 - **Git**
 - **Visual Studio Code** (recomendado)
 
@@ -97,21 +105,19 @@ sena-inventario-sistema/
 │   ├── .env.example                  # Ejemplo de variables de entorno
 │   └── uploads/                      # Carpeta local (deprecada con Cloudinary)
 │
-├── frontend/                         # 💻 React Frontend
-│   ├── src/
-│   │   ├── components/
-│   │   │   ├── ListaActivos.jsx      # Vista de lista de activos
-│   │   │   ├── CrearActivo.jsx       # Formulario crear activo
-│   │   │   ├── EditarActivo.jsx      # Formulario editar activo
-│   │   │   ├── Galeria.jsx           # Galería de imágenes
-│   │   │   └── Historial.jsx         # Registro de cambios
-│   │   ├── App.jsx                   # Componente principal
-│   │   ├── App.css                   # Estilos globales
-│   │   └── index.js                  # Punto de entrada React
-│   ├── package.json                  # Dependencias Node
-│   ├── .env.example                  # Ejemplo de variables de entorno
-│   └── public/
-│       └── index.html                # HTML base
+├── frontend/                         # 💻 HTML/CSS/JavaScript Frontend
+│   ├── static/
+│   │   ├── css/
+│   │   │   └── styles.css           # Estilos globales
+│   │   ├── js/
+│   │   │   ├── main.js              # Script principal
+│   │   │   ├── api.js               # Llamadas al API
+│   │   │   ├── activos.js           # Lógica de activos
+│   │   │   ├── historial.js         # Lógica de historial
+│   │   │   └── utils.js             # Funciones utilitarias
+│   │   └── images/
+│   │       └── [assets]             # Imágenes locales
+│   └── index.html                    # Página principal
 │
 ├── .gitignore                        # Archivos a ignorar en Git
 └── README.md                         # Este archivo
@@ -186,34 +192,35 @@ CLOUDINARY_API_SECRET=tu_api_secret
 
 ### Paso 3: Configurar Frontend
 
-#### 3.1 Instalar dependencias
+El frontend es HTML/CSS/JavaScript vanilla, **no requiere instalación de dependencias**.
 
-```bash
-cd ../frontend
-npm install
+#### 3.1 Crear archivo `.env.js` (en `frontend/static/js/`)
+
+Crea el archivo `frontend/static/js/config.js`:
+
+```javascript
+// 🔗 Configuración del Frontend
+
+// Desarrollo local
+const CONFIG = {
+  API_URL: 'http://localhost:8000/api',
+  ENV: 'development',
+  TIMEOUT: 5000 // milisegundos
+};
+
+// Para producción (Render), cambiar a:
+// const CONFIG = {
+//   API_URL: 'https://sena-inventario-backend.onrender.com/api',
+//   ENV: 'production',
+//   TIMEOUT: 10000
+// };
 ```
 
-**Dependencias principales:**
-- `react==18.2.0` - Framework UI
-- `axios==1.6.0` - Cliente HTTP
-- `react-router-dom==6.17.0` - Enrutamiento
-
-#### 3.2 Crear archivo `.env`
-
-Crea el archivo `frontend/.env`:
-
-```env
-# 🔗 API Backend
-REACT_APP_API_URL=http://localhost:8000/api
-
-# Ambiente
-REACT_APP_ENV=development
-```
-
-Para producción (Render):
-```env
-REACT_APP_API_URL=https://sena-inventario-backend.onrender.com/api
-REACT_APP_ENV=production
+**Luego importar en `index.html`:**
+```html
+<script src="static/js/config.js"></script>
+<script src="static/js/api.js"></script>
+<script src="static/js/main.js"></script>
 ```
 
 ---
@@ -353,8 +360,8 @@ Las imágenes se suben a una carpeta llamada `sena-inventario` automáticamente.
 2. Conecta el mismo repositorio
 3. Configura:
    - **Name:** `sena-inventario-frontend`
-   - **Build Command:** `cd frontend && npm install && npm run build`
-   - **Publish Directory:** `frontend/build`
+   - **Build Command:** Deja vacío (no necesita compilar)
+   - **Publish Directory:** `frontend`
 
 4. Click en **Create Static Site**
 
@@ -378,14 +385,7 @@ CLOUDINARY_API_SECRET=LZjlYondUO-il0BCbg2tf2NVKY
 
 **Para Frontend (`sena-inventario-frontend`):**
 
-1. Ve a **Environment**
-2. Agrega esta variable:
-
-```
-REACT_APP_API_URL=https://sena-inventario-backend.onrender.com/api
-```
-
-3. Click en **Save changes**
+No requiere variables de entorno adicionales. El frontend se sirve estáticamente desde Render.
 
 ---
 
@@ -408,25 +408,38 @@ INFO:     Application startup complete
 - API: `http://localhost:8000`
 - Docs interactiva: `http://localhost:8000/docs`
 
-### Iniciar Frontend (en otra terminal)
+### Abrir Frontend
 
+El frontend es un archivo HTML estático, abre simplemente:
+
+**Opción 1: Abrir directamente en el navegador**
+```
+Navega a: frontend/index.html
+```
+
+**Opción 2: Servir con un servidor local (recomendado)**
+
+Si tienes Python instalado:
 ```bash
 cd frontend
-npm start
+python -m http.server 3000
 ```
 
-**Salida esperada:**
+Luego abre en navegador:
 ```
-Compiled successfully!
-You can now view the app in the browser at http://localhost:3000
+http://localhost:3000
 ```
 
-**Acceso:**
-- App: `http://localhost:3000`
+**Si tienes Node.js (con npx):**
+```bash
+cd frontend
+npx http-server -p 3000
+```
 
 ### Flujo de Uso
 
-1. Abre la app en `http://localhost:3000`
+1. Abre la app en `http://localhost:3000` (o abre `frontend/index.html`)
+
 2. **Crear Activo:**
    - Click en botón "➕ Nuevo Activo"
    - Rellena los campos (placa, descripción, responsable, etc.)
@@ -482,6 +495,26 @@ GET /api/activos
 **Ejemplo:**
 ```bash
 curl "http://localhost:8000/api/activos?responsable=Juan&limit=10"
+```
+
+**Respuesta:**
+```json
+{
+  "total": 25,
+  "activos": [
+    {
+      "id": 1,
+      "placa": "ACT-001",
+      "descripcion": "Computadora HP",
+      "modelo": "ProDesk 400",
+      "responsable": "Juan Pérez",
+      "cedula_responsable": "1234567890",
+      "ubicacion": "Oficina Principal",
+      "imagenes": ["https://res.cloudinary.com/..."],
+      "created_at": "2026-02-10T14:30:00"
+    }
+  ]
+}
 ```
 
 ---
@@ -550,12 +583,16 @@ DELETE /api/activos/{activo_id}
 GET /api/activos/{activo_id}/historial
 ```
 
+**Retorna:** Array de cambios realizados al activo
+
 ---
 
 #### Obtener historial general
 ```http
 GET /api/historial
 ```
+
+**Retorna:** Últimos 500 cambios del sistema
 
 ---
 
@@ -566,7 +603,7 @@ GET /api/historial
 GET /api/exportar/excel
 ```
 
-**Retorna:** Archivo XLSX descargable
+**Retorna:** Archivo XLSX descargable con todos los activos
 
 ---
 
@@ -582,6 +619,8 @@ GET /api/exportar/excel
 3. Asegúrate de estar conectado a internet
 4. Reinicia el servidor: `Ctrl+C` y vuelve a ejecutar
 
+---
+
 ### ❌ Error: "Unknown API key" o "Invalid Signature"
 
 **Causa:** Credenciales de Cloudinary incorrectas
@@ -592,23 +631,41 @@ GET /api/exportar/excel
 3. Asegúrate de que `CLOUDINARY_API_SECRET` esté completo
 4. Regenera las claves en Cloudinary si es necesario
 
+---
+
 ### ❌ Error: "CORS error" en frontend
 
 **Causa:** Backend no permite solicitudes del frontend
 
 **Soluciones:**
-1. Verifica que `REACT_APP_API_URL` sea correcto
-2. En producción (Render), usa `https://sena-inventario-backend.onrender.com/api`
-3. Backend debe tener CORS habilitado (revisa `app/main.py`)
+1. Verifica que el API URL sea correcto en `config.js`
+2. En desarrollo (local): `http://localhost:8000/api`
+3. En producción (Render): `https://sena-inventario-backend.onrender.com/api`
+4. Backend debe tener CORS habilitado (revisa `app/main.py`)
+
+---
+
+### ❌ Error: "404 Not Found" en frontend
+
+**Causa:** El servidor no está sirviendo los archivos HTML
+
+**Soluciones:**
+1. Asegúrate de servir desde la carpeta `frontend`
+2. Si usas Python: `python -m http.server 3000` (desde `frontend/`)
+3. Verifica que `index.html` existe en `frontend/`
+
+---
 
 ### ❌ Error: "File too large" al subir imágenes
 
 **Causa:** Cloudinary tiene límite de tamaño
 
 **Soluciones:**
-1. Compress la imagen antes de subir
+1. Comprime la imagen antes de subir
 2. Máximo recomendado: 10MB por imagen
 3. Usa formatos: JPG, PNG, WebP
+
+---
 
 ### ❌ Cambios en Git no aparecen en Render
 
@@ -619,6 +676,8 @@ GET /api/exportar/excel
 2. Espera a que termine (5-10 minutos)
 3. Verifica que `git push` se completó: `git log`
 
+---
+
 ### ❌ "Module not found" en backend
 
 **Causa:** Falta instalar dependencias
@@ -628,6 +687,8 @@ GET /api/exportar/excel
 pip install -r backend/requirements.txt
 pip install --upgrade pip
 ```
+
+---
 
 ### ❌ "Port already in use" localhost:8000
 
@@ -658,21 +719,23 @@ kill -9 <PID>
 | **Cloudinary** | 1.44+ | Almacenamiento de imágenes en nube |
 | **Uvicorn** | 0.24+ | Servidor ASGI |
 | **Pandas** | 2.1+ | Procesamiento de datos |
+| **Python-dotenv** | 1.0+ | Variables de entorno |
 
 ### Frontend
-| Tecnología | Versión | Propósito |
-|-----------|---------|----------|
-| **React** | 18+ | Librería UI |
-| **Axios** | 1.6+ | Cliente HTTP |
-| **React Router** | 6.17+ | Enrutamiento |
-| **CSS3** | - | Estilos |
+| Tecnología | Descripción |
+|-----------|-----------|
+| **HTML5** | Estructura semántica |
+| **CSS3** | Estilos responsivos |
+| **JavaScript (Vanilla)** | Lógica interactiva sin dependencias |
+| **Fetch API** | Comunicación con backend |
+| **DOM API** | Manipulación de elementos |
 
 ### DevOps / Infraestructura
 | Servicio | Propósito |
 |---------|----------|
-| **Render** | Hosting y despliegue |
-| **Supabase** | Base de datos PostgreSQL |
-| **Cloudinary** | Almacenamiento de imágenes |
+| **Render** | Hosting y despliegue (Backend + Frontend) |
+| **Supabase** | Base de datos PostgreSQL administrada |
+| **Cloudinary** | Almacenamiento y optimización de imágenes |
 | **GitHub** | Control de versiones |
 
 ---
@@ -702,13 +765,13 @@ Para reportar problemas o sugerencias:
 ## 🎯 Roadmap Futuro
 
 - [ ] Autenticación y autorización por roles
-- [ ] Notificaciones en tiempo real
+- [ ] Notificaciones en tiempo real (WebSockets)
 - [ ] Búsqueda avanzada con filtros complejos
 - [ ] Reportes PDF personalizados
-- [ ] Mobile app (React Native)
-- [ ] Integración con SAP o ERP
 - [ ] Código QR/Barcode para activos
 - [ ] Auditoría avanzada de cambios
+- [ ] Importación de activos desde CSV
+- [ ] Sincronización offline
 
 ---
 
@@ -717,3 +780,31 @@ Para reportar problemas o sugerencias:
 **Versión:** 1.0.0 (Stable)
 
 **Status:** ✅ Producción
+
+---
+
+## 🚀 Quick Start
+
+**Modo más rápido para empezar:**
+
+```bash
+# 1. Clonar
+git clone https://github.com/inventariosennova/sena-inventario-sistema.git
+
+# 2. Backend
+cd sena-inventario-sistema/backend
+python -m venv venv
+# Activar venv (ver instrucciones arriba)
+pip install -r requirements.txt
+# Crear .env con credenciales
+python -m uvicorn app.main:app --reload
+
+# 3. Frontend (en otra terminal)
+cd ../frontend
+python -m http.server 3000
+
+# 4. Abrir en navegador
+# http://localhost:3000
+```
+
+¡Listo! 🎉

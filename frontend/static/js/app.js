@@ -23,34 +23,11 @@ function iniciarApp() {
     cargarUbicaciones();
 }
 
-// Cargar activos al iniciar (con login previo)
+// Cargar activos al iniciar la aplicación
 document.addEventListener('DOMContentLoaded', () => {
-    if (sessionStorage.getItem('logged') === 'true') {
-        iniciarApp();
-    } else {
-        const modalLogin = document.getElementById('modalLogin');
-        if (modalLogin) {
-            modalLogin.style.display = 'block';
-        }
-    }
-
-    const loginForm = document.getElementById('loginForm');
-    if (loginForm) {
-        loginForm.addEventListener('submit', (e) => {
-            e.preventDefault();
-            const usuario = document.getElementById('loginUsuario').value.trim();
-            const password = document.getElementById('loginPassword').value.trim();
-
-            if (usuario === 'sena' && password === 'sena2026') {
-                sessionStorage.setItem('logged', 'true');
-                document.getElementById('modalLogin').style.display = 'none';
-                iniciarApp();
-            } else {
-                alert('❌ Usuario o contraseña incorrectos');
-            }
-        });
-    }
+    iniciarApp();
 });
+
 
 // Función para cargar todos los activos
 async function cargarActivos(filtros = {}) {
@@ -380,7 +357,6 @@ window.onclick = function(event) {
     const modal = document.getElementById('modal');
     const modalVer = document.getElementById('modalVer');
     const modalHistorial = document.getElementById('modalHistorial');
-    const modalLogin = document.getElementById('modalLogin');
     const modalCamara = document.getElementById('modalCamara');
     
     if (event.target === modal) {
@@ -391,9 +367,6 @@ window.onclick = function(event) {
     }
     if (event.target === modalHistorial) {
         modalHistorial.style.display = 'none';
-    }
-    if (event.target === modalLogin) {
-        // No cerramos el login al hacer clic fuera para obligar autenticación
     }
     if (event.target === modalCamara) {
         cerrarCamara();

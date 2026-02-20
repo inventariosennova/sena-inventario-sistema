@@ -1,7 +1,9 @@
 # backend/app/routes/admin.py
 import os
 import uuid
-import resend
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
@@ -18,20 +20,22 @@ class InvitacionIn(BaseModel):
     nombre: str
 
 
-# ─── Utilidad: enviar email con Resend ──────────────────────
-def enviar_email_resend(to_email: str, nombre: str, invite_link: str):
-    api_key     = os.getenv("RESEND_API_KEY")
-    sender      = os.getenv("SENDER_EMAIL", "onboarding@resend.dev")
+# ─── Utilidad: enviar email con SMTP (Mailersend) ────────────
+def enviar_email_smtp(to_email: str, nombre: str, invite_link: str):
+    host     = os.getenv("EMAIL_HOST")
+    port     = int(os.getenv("EMAIL_PORT", "587"))
+    user     = os.getenv("EMAIL_USER")
+    password = os.getenv("EMAIL_PASS")
+    sender   = os.getenv("SENDER_EMAIL", user)
 
-    if not api_key:
-        raise RuntimeError("Variable RESEND_API_KEY no configurada en el servidor.")
-
-    resend.api_key = api_key
+    if not host or not user or not password:
+        raise RuntimeError(
+            "Faltan variables: EMAIL_HOST, EMAIL_USER o EMAIL_PASS"
+        )
 
     html_body = f"""
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: auto;">
 
-        <!-- Header verde SENA -->
         <div style="background: #39a900; padding: 24px 20px;
                     border-radius: 10px 10px 0 0; text-align: center;">
             <h1 style="color: white; margin: 0; font-size: 22px;">
@@ -42,7 +46,6 @@ def enviar_email_resend(to_email: str, nombre: str, invite_link: str):
             </p>
         </div>
 
-        <!-- Cuerpo -->
         <div style="padding: 32px 28px; border: 1px solid #ddd;
                     border-top: none; border-radius: 0 0 10px 10px;
                     background: #ffffff;">
@@ -58,7 +61,6 @@ def enviar_email_resend(to_email: str, nombre: str, invite_link: str):
                 Haz click en el botón para acceder al sistema:
             </p>
 
-            <!-- Botón -->
             <div style="text-align: center; margin: 32px 0;">
                 <a href="{invite_link}"
                    style="background: #39a900; color: white;
@@ -69,35 +71,35 @@ def enviar_email_resend(to_email: str, nombre: str, invite_link: str):
                 </a>
             </div>
 
-            <!-- Link de respaldo -->
             <p style="color: #888; font-size: 13px;">
-                Si el botón no funciona, copia y pega este link en tu navegador:
+                Si el botón no funciona, copia este link en tu navegador:
             </p>
             <p style="background: #f5f5f5; padding: 10px; border-radius: 6px;
                       font-size: 12px; color: #555; word-break: break-all;">
                 {invite_link}
             </p>
 
-            <!-- Pie -->
             <hr style="border: none; border-top: 1px solid #eee; margin: 24px 0;">
             <p style="color: #bbb; font-size: 11px; text-align: center;">
                 Este es un mensaje automático del Sistema Inventario SENA.<br>
-                Si no esperabas esta invitación, puedes ignorar este correo.<br>
+                Si no esperabas esta invitación, ignora este correo.<br>
                 Este enlace es de un solo uso.
             </p>
         </div>
     </div>
     """
 
-    params = {
-        "from":    sender,
-        "to":      [to_email],
-        "subject": "📦 Invitación — Sistema Inventario SENA SENNOVA",
-        "html":    html_body,
-    }
+    msg = MIMEMultipart("alternative")
+    msg["Subject"] = "📦 Invitación — Sistema Inventario SENA SENNOVA"
+    msg["From"]    = sender
+    msg["To"]      = to_email
+    msg.attach(MIMEText(html_body, "html"))
 
-    response = resend.Emails.send(params)
-    return response
+    with smtplib.SMTP(host, port) as server:
+        server.ehlo()
+        server.starttls()
+        server.login(user, password)
+        server.sendmail(sender, [to_email], msg.as_string())
 
 
 # ─── Endpoint 1: Crear invitación + enviar email ─────────────
@@ -107,13 +109,13 @@ def invitar_instructor(payload: InvitacionIn):
     if not frontend_url:
         raise HTTPException(
             status_code=500,
-            detail="Variable FRONTEND_URL no configurada en el servidor."
+            detail="Variable FRONTEND_URL no configurada."
         )
 
     token       = str(uuid.uuid4())
     invite_link = f"{frontend_url}/?invite={token}"
 
-    # ── Guardar en base de datos (upsert por email) ──────────
+    # ── Guardar en base de datos ─────────────────────────────
     try:
         with engine.begin() as conn:
             conn.execute(text("""
@@ -137,9 +139,9 @@ def invitar_instructor(payload: InvitacionIn):
             detail=f"Error guardando invitación en BD: {str(e)}"
         )
 
-    # ── Enviar correo con Resend ─────────────────────────────
+    # ── Enviar correo con SMTP ───────────────────────────────
     try:
-        enviar_email_resend(payload.email, payload.nombre, invite_link)
+        enviar_email_smtp(payload.email, payload.nombre, invite_link)
     except Exception as e:
         raise HTTPException(
             status_code=500,
@@ -173,7 +175,7 @@ def listar_invitaciones():
         )
 
 
-# ─── Endpoint 3: Validar token de invitación ────────────────
+# ─── Endpoint 3: Validar token ──────────────────────────────
 @router.get("/validar-invitacion")
 def validar_invitacion(token: str):
     try:
@@ -210,7 +212,7 @@ def validar_invitacion(token: str):
         )
 
 
-# ─── Endpoint 4: Marcar invitación como usada ───────────────
+# ─── Endpoint 4: Marcar como usada ──────────────────────────
 @router.post("/marcar-usada")
 def marcar_usada(token: str):
     try:

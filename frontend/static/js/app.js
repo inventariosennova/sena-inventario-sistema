@@ -35,8 +35,10 @@ document.addEventListener('DOMContentLoaded', () => {
             const correo = document.getElementById('adminCorreo').value.trim();
             const clave  = document.getElementById('adminClave').value.trim();
 
-            const adminEmail = 'lider@sena.edu.co';   // ← mismo valor que pusiste en Render ADMIN_EMAIL
-            const adminPass  = 'ClaveSegura2026!';     // ← mismo valor que pusiste en Render ADMIN_PASS
+            // ✅ DESPUÉS (tus valores reales de Render)
+                const adminEmail = 'inventariosennova@gmail.com';
+                const adminPass  = 'Sennova12.';
+            // ← mismo valor que pusiste en Render ADMIN_PASS
 
             if (correo === adminEmail && clave === adminPass) {
                 sessionStorage.setItem('admin_ok', 'true');

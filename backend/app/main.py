@@ -2,11 +2,14 @@ from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from app.routes import inventario
+from app.routes.admin import router as admin_router  # ← LÍNEA NUEVA
 from app.database.database import init_db
 import os
 from pathlib import Path
 
+
 app = FastAPI(title="Sistema Inventario SENA SENNOVA CEAI")
+
 
 # CORS
 app.add_middleware(
@@ -17,22 +20,29 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
 # Crear carpeta uploads si no existe
 Path("uploads").mkdir(exist_ok=True)
+
 
 # Montar carpeta de uploads PRIMERO
 app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
 
+
 # Incluir rutas API
 app.include_router(inventario.router)
+app.include_router(admin_router)  # ← LÍNEA NUEVA
+
 
 @app.on_event("startup")
 async def startup_event():
     init_db()
 
+
 @app.get("/health")
 async def health():
     return {"status": "ok"}
+
 
 # Montar archivos estáticos del frontend AL FINAL
 frontend_path = os.path.join(os.path.dirname(__file__), "../../frontend")

@@ -21,8 +21,9 @@
                 <button class="btn-icon" title="Notificaciones">
                     <i class="fas fa-bell"></i>
                 </button>
-                <button class="btn-icon" title="Usuario">
-                    <i class="fas fa-user-circle"></i>
+                <!-- 👤 BOTÓN MODIFICADO → abre login admin -->
+                <button class="btn-icon" title="Admin" onclick="abrirModalAdmin()">
+                    <i class="fas fa-user-shield"></i>
                 </button>
             </div>
         </div>
@@ -34,7 +35,6 @@
             <div class="section-header">
                 <h2><i class="fas fa-search"></i> Búsqueda y Filtros</h2>
             </div>
-            
             <div class="search-filters">
                 <div class="filter-group">
                     <label><i class="fas fa-barcode"></i> Placa</label>
@@ -57,7 +57,6 @@
                     </select>
                 </div>
             </div>
-
             <div class="search-actions">
                 <button class="btn btn-primary" onclick="buscarActivos()">
                     <i class="fas fa-search"></i> Buscar
@@ -85,7 +84,6 @@
                     <span class="results-count" id="resultsCount">Mostrando 0 de 0 activos</span>
                 </div>
             </div>
-
             <div class="table-container">
                 <table class="inventory-table">
                     <thead>
@@ -113,7 +111,6 @@
                     </tbody>
                 </table>
             </div>
-
             <div class="pagination" id="pagination"></div>
         </section>
     </main>
@@ -127,44 +124,36 @@
                     <i class="fas fa-times"></i>
                 </span>
             </div>
-            
             <form id="activoForm" enctype="multipart/form-data">
                 <input type="hidden" id="activoId">
-                
                 <div class="form-group">
                     <label><i class="fas fa-barcode"></i> Placa *</label>
                     <input type="text" id="placa" required placeholder="Ej: 121323">
                 </div>
-
                 <div class="form-group">
                     <label><i class="fas fa-align-left"></i> Descripción *</label>
                     <textarea id="descripcion" rows="3" required placeholder="Descripción detallada del activo"></textarea>
                 </div>
-
                 <div class="form-grid">
                     <div class="form-group">
                         <label><i class="fas fa-cube"></i> Modelo</label>
                         <input type="text" id="modelo" placeholder="Ej: HP ProBook 450">
                     </div>
-
                     <div class="form-group">
                         <label><i class="fas fa-user"></i> Responsable *</label>
                         <input type="text" id="responsable" required placeholder="Nombre completo">
                     </div>
                 </div>
-
                 <div class="form-grid">
                     <div class="form-group">
                         <label><i class="fas fa-id-card"></i> Cédula del Responsable</label>
                         <input type="text" id="cedulaResponsable" placeholder="Ej: 1234567890">
                     </div>
-
                     <div class="form-group">
                         <label><i class="fas fa-map-marker-alt"></i> Ubicación</label>
                         <input type="text" id="ubicacion" placeholder="Ej: Sala de Informática">
                     </div>
                 </div>
-
                 <div class="form-group">
                     <label><i class="fas fa-images"></i> Imágenes del Activo</label>
                     <div class="file-input-wrapper">
@@ -181,9 +170,7 @@
                     </div>
                     <small class="form-hint">Puedes seleccionar múltiples imágenes (JPG, PNG) o tomar fotos con la cámara</small>
                 </div>
-
                 <div id="imagenesPreview" class="imagenes-preview"></div>
-
                 <div class="form-actions">
                     <button type="button" class="btn btn-secondary" onclick="cerrarModal()">
                         <i class="fas fa-times"></i> Cancelar
@@ -222,7 +209,6 @@
         </div>
     </div>
 
-
     <!-- Modal Cámara -->
     <div id="modalCamara" class="modal">
         <div class="modal-content" style="max-width: 600px;">
@@ -244,8 +230,116 @@
         </div>
     </div>
 
-    <script src="/static/js/app.js?v=5"></script>
+    <!-- ✅ NUEVO: Modal Login Admin -->
+    <div id="modalAdminLogin" class="modal" style="display:none;">
+        <div class="modal-content" style="max-width: 420px;">
+            <div class="modal-header" style="background: #39a900;">
+                <h2 style="color: white;">
+                    <i class="fas fa-user-shield"></i> Admin Líder
+                </h2>
+                <span class="close" onclick="cerrarModalAdmin()" style="color: white;">
+                    <i class="fas fa-times"></i>
+                </span>
+            </div>
+            <form id="adminLoginForm" style="padding: 24px;">
+                <div class="form-group">
+                    <label><i class="fas fa-envelope"></i> Correo Admin</label>
+                    <input type="email" id="adminCorreo" required
+                        placeholder="lider@sena.edu.co"
+                        style="width:100%; padding:10px; border:1px solid #ddd; border-radius:8px; margin-top:6px;">
+                </div>
+                <div class="form-group" style="margin-top: 16px;">
+                    <label><i class="fas fa-lock"></i> Contraseña</label>
+                    <input type="password" id="adminClave" required
+                        placeholder="********"
+                        style="width:100%; padding:10px; border:1px solid #ddd; border-radius:8px; margin-top:6px;">
+                </div>
+                <div style="margin-top: 24px;">
+                    <button type="submit" class="btn btn-primary"
+                        style="width:100%; justify-content:center; background:#39a900; border-color:#39a900;">
+                        <i class="fas fa-sign-in-alt"></i> Entrar como Admin
+                    </button>
+                </div>
+                <p style="color:#999; font-size:12px; text-align:center; margin-top:12px;">
+                    Solo para el instructor líder del sistema
+                </p>
+            </form>
+        </div>
+    </div>
 
+    <!-- ✅ NUEVO: Modal Invitaciones -->
+    <div id="modalInvitaciones" class="modal" style="display:none;">
+        <div class="modal-content modal-large">
+            <div class="modal-header" style="background: #39a900;">
+                <h2 style="color: white;">
+                    <i class="fas fa-paper-plane"></i> Panel Admin — Invitar Instructores
+                </h2>
+                <span class="close" onclick="cerrarModalInvitaciones()" style="color: white;">
+                    <i class="fas fa-times"></i>
+                </span>
+            </div>
+            <div class="detail-content">
 
+                <!-- Formulario invitar -->
+                <div style="background:#f8f9fa; padding:20px; border-radius:8px; margin-bottom:24px;">
+                    <h3 style="margin-bottom:16px;">
+                        <i class="fas fa-user-plus"></i> Nueva Invitación
+                    </h3>
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label><i class="fas fa-envelope"></i> Correo del instructor</label>
+                            <input type="email" id="invEmail"
+                                placeholder="instructor@sena.edu.co"
+                                style="width:100%; padding:10px; border:1px solid #ddd; border-radius:8px; margin-top:6px;">
+                        </div>
+                        <div class="form-group">
+                            <label><i class="fas fa-user"></i> Nombre completo</label>
+                            <input type="text" id="invNombre"
+                                placeholder="Nombre del instructor"
+                                style="width:100%; padding:10px; border:1px solid #ddd; border-radius:8px; margin-top:6px;">
+                        </div>
+                    </div>
+                    <div style="margin-top:16px; display:flex; gap:12px; align-items:center;">
+                        <button class="btn btn-success" onclick="enviarInvitacionAdmin()">
+                            <i class="fas fa-paper-plane"></i> Generar Invitación
+                        </button>
+                    </div>
+
+                    <!-- Caja donde aparece el link generado -->
+                    <div id="invLinkBox" style="display:none; margin-top:16px;
+                        background:#e8f5e9; border:1px solid #39a900;
+                        border-radius:8px; padding:16px;">
+                        <p style="margin:0 0 8px; font-weight:bold; color:#2e7d32;">
+                            ✅ Invitación generada — Copia y comparte este link:
+                        </p>
+                        <div style="display:flex; gap:8px; align-items:center;">
+                            <input type="text" id="invLinkTexto" readonly
+                                style="flex:1; padding:8px; border:1px solid #ccc;
+                                border-radius:6px; background:white; font-size:13px;">
+                            <button class="btn btn-primary" onclick="copiarLink()">
+                                <i class="fas fa-copy"></i> Copiar
+                            </button>
+                        </div>
+                        <small style="color:#666; margin-top:8px; display:block;">
+                            Envía este link por WhatsApp o correo al instructor
+                        </small>
+                    </div>
+                </div>
+
+                <!-- Lista invitaciones -->
+                <div>
+                    <h3 style="margin-bottom:16px;">
+                        <i class="fas fa-list"></i> Invitaciones enviadas
+                    </h3>
+                    <div id="listaInvitaciones">
+                        <p style="color:#999;">Cargando invitaciones...</p>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/js/app.js?v=6"></script>
 </body>
 </html>

@@ -1,6 +1,7 @@
 # backend/app/routes/admin.py
 import os
 import uuid
+import resend
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
@@ -17,7 +18,89 @@ class InvitacionIn(BaseModel):
     nombre: str
 
 
-# ─── Endpoint 1: Crear invitación (sin email) ───────────────
+# ─── Utilidad: enviar email con Resend ──────────────────────
+def enviar_email_resend(to_email: str, nombre: str, invite_link: str):
+    api_key     = os.getenv("RESEND_API_KEY")
+    sender      = os.getenv("SENDER_EMAIL", "onboarding@resend.dev")
+
+    if not api_key:
+        raise RuntimeError("Variable RESEND_API_KEY no configurada en el servidor.")
+
+    resend.api_key = api_key
+
+    html_body = f"""
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: auto;">
+
+        <!-- Header verde SENA -->
+        <div style="background: #39a900; padding: 24px 20px;
+                    border-radius: 10px 10px 0 0; text-align: center;">
+            <h1 style="color: white; margin: 0; font-size: 22px;">
+                📦 Sistema Inventario SENA
+            </h1>
+            <p style="color: #e8f5e9; margin: 6px 0 0; font-size: 14px;">
+                SENNOVA CEAI
+            </p>
+        </div>
+
+        <!-- Cuerpo -->
+        <div style="padding: 32px 28px; border: 1px solid #ddd;
+                    border-top: none; border-radius: 0 0 10px 10px;
+                    background: #ffffff;">
+
+            <p style="font-size: 16px; color: #333;">
+                Hola <strong>{nombre}</strong>,
+            </p>
+            <p style="color: #555; line-height: 1.6;">
+                El instructor líder te ha invitado a acceder al
+                <strong>Sistema de Inventario SENA SENNOVA CEAI</strong>.
+            </p>
+            <p style="color: #555;">
+                Haz click en el botón para acceder al sistema:
+            </p>
+
+            <!-- Botón -->
+            <div style="text-align: center; margin: 32px 0;">
+                <a href="{invite_link}"
+                   style="background: #39a900; color: white;
+                          padding: 14px 36px; border-radius: 8px;
+                          text-decoration: none; font-size: 16px;
+                          font-weight: bold; display: inline-block;">
+                    ✅ Acceder al Sistema
+                </a>
+            </div>
+
+            <!-- Link de respaldo -->
+            <p style="color: #888; font-size: 13px;">
+                Si el botón no funciona, copia y pega este link en tu navegador:
+            </p>
+            <p style="background: #f5f5f5; padding: 10px; border-radius: 6px;
+                      font-size: 12px; color: #555; word-break: break-all;">
+                {invite_link}
+            </p>
+
+            <!-- Pie -->
+            <hr style="border: none; border-top: 1px solid #eee; margin: 24px 0;">
+            <p style="color: #bbb; font-size: 11px; text-align: center;">
+                Este es un mensaje automático del Sistema Inventario SENA.<br>
+                Si no esperabas esta invitación, puedes ignorar este correo.<br>
+                Este enlace es de un solo uso.
+            </p>
+        </div>
+    </div>
+    """
+
+    params = {
+        "from":    sender,
+        "to":      [to_email],
+        "subject": "📦 Invitación — Sistema Inventario SENA SENNOVA",
+        "html":    html_body,
+    }
+
+    response = resend.Emails.send(params)
+    return response
+
+
+# ─── Endpoint 1: Crear invitación + enviar email ─────────────
 @router.post("/invitar")
 def invitar_instructor(payload: InvitacionIn):
     frontend_url = os.getenv("FRONTEND_URL", "").rstrip("/")
@@ -27,10 +110,10 @@ def invitar_instructor(payload: InvitacionIn):
             detail="Variable FRONTEND_URL no configurada en el servidor."
         )
 
-    token = str(uuid.uuid4())
+    token       = str(uuid.uuid4())
     invite_link = f"{frontend_url}/?invite={token}"
 
-    # Guardar en base de datos (upsert por email)
+    # ── Guardar en base de datos (upsert por email) ──────────
     try:
         with engine.begin() as conn:
             conn.execute(text("""
@@ -51,15 +134,23 @@ def invitar_instructor(payload: InvitacionIn):
     except Exception as e:
         raise HTTPException(
             status_code=500,
-            detail=f"Error guardando invitación: {str(e)}"
+            detail=f"Error guardando invitación en BD: {str(e)}"
         )
 
-    # Retorna el link para que el admin lo comparta manualmente
+    # ── Enviar correo con Resend ─────────────────────────────
+    try:
+        enviar_email_resend(payload.email, payload.nombre, invite_link)
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Invitación guardada pero error enviando correo: {str(e)}"
+        )
+
     return {
-        "ok": True,
-        "mensaje": f"Invitación creada para {payload.email}",
-        "token": token,
-        "link": invite_link  # ← Admin copia este link y lo envía
+        "ok":      True,
+        "mensaje": f"✅ Invitación enviada al correo {payload.email}",
+        "token":   token,
+        "link":    invite_link
     }
 
 
@@ -105,8 +196,8 @@ def validar_invitacion(token: str):
                 detail="Esta invitación ya fue utilizada."
             )
         return {
-            "ok": True,
-            "email": row["email"],
+            "ok":     True,
+            "email":  row["email"],
             "nombre": row["nombre"]
         }
 

@@ -4,6 +4,7 @@ import uuid
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
+from email.header import Header
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
@@ -23,7 +24,7 @@ class InvitacionIn(BaseModel):
 # ─── Utilidad: enviar email con SMTP (Mailersend) ────────────
 def enviar_email_smtp(to_email: str, nombre: str, invite_link: str):
     host     = os.getenv("EMAIL_HOST")
-    port     = int(os.getenv("EMAIL_PORT", "2525"))  # ← 2525 no bloqueado en cloud
+    port     = int(os.getenv("EMAIL_PORT", "2525"))
     user     = os.getenv("EMAIL_USER")
     password = os.getenv("EMAIL_PASS")
     sender   = os.getenv("SENDER_EMAIL", user)
@@ -39,7 +40,7 @@ def enviar_email_smtp(to_email: str, nombre: str, invite_link: str):
         <div style="background: #39a900; padding: 24px 20px;
                     border-radius: 10px 10px 0 0; text-align: center;">
             <h1 style="color: white; margin: 0; font-size: 22px;">
-                📦 Sistema Inventario SENA
+                Sistema Inventario SENA
             </h1>
             <p style="color: #e8f5e9; margin: 6px 0 0; font-size: 14px;">
                 SENNOVA CEAI
@@ -54,11 +55,11 @@ def enviar_email_smtp(to_email: str, nombre: str, invite_link: str):
                 Hola <strong>{nombre}</strong>,
             </p>
             <p style="color: #555; line-height: 1.6;">
-                El instructor líder te ha invitado a acceder al
+                El instructor lider te ha invitado a acceder al
                 <strong>Sistema de Inventario SENA SENNOVA CEAI</strong>.
             </p>
             <p style="color: #555;">
-                Haz click en el botón para acceder al sistema:
+                Haz click en el boton para acceder al sistema:
             </p>
 
             <div style="text-align: center; margin: 32px 0;">
@@ -67,12 +68,12 @@ def enviar_email_smtp(to_email: str, nombre: str, invite_link: str):
                           padding: 14px 36px; border-radius: 8px;
                           text-decoration: none; font-size: 16px;
                           font-weight: bold; display: inline-block;">
-                    ✅ Acceder al Sistema
+                    Acceder al Sistema
                 </a>
             </div>
 
             <p style="color: #888; font-size: 13px;">
-                Si el botón no funciona, copia este link en tu navegador:
+                Si el boton no funciona, copia este link en tu navegador:
             </p>
             <p style="background: #f5f5f5; padding: 10px; border-radius: 6px;
                       font-size: 12px; color: #555; word-break: break-all;">
@@ -81,8 +82,8 @@ def enviar_email_smtp(to_email: str, nombre: str, invite_link: str):
 
             <hr style="border: none; border-top: 1px solid #eee; margin: 24px 0;">
             <p style="color: #bbb; font-size: 11px; text-align: center;">
-                Este es un mensaje automático del Sistema Inventario SENA.<br>
-                Si no esperabas esta invitación, ignora este correo.<br>
+                Este es un mensaje automatico del Sistema Inventario SENA.<br>
+                Si no esperabas esta invitacion, ignora este correo.<br>
                 Este enlace es de un solo uso.
             </p>
         </div>
@@ -90,12 +91,11 @@ def enviar_email_smtp(to_email: str, nombre: str, invite_link: str):
     """
 
     msg = MIMEMultipart("alternative")
-    msg["Subject"] = "📦 Invitación — Sistema Inventario SENA SENNOVA"
+    msg["Subject"] = Header("Invitacion - Sistema Inventario SENA SENNOVA", "utf-8")
     msg["From"]    = sender
     msg["To"]      = to_email
-    msg.attach(MIMEText(html_body, "html"))
+    msg.attach(MIMEText(html_body, "html", "utf-8"))
 
-    # ✅ CORREGIDO — más robusto para entornos cloud como Render
     with smtplib.SMTP(host, port, timeout=30) as server:
         server.set_debuglevel(0)
         server.ehlo()
@@ -139,7 +139,7 @@ def invitar_instructor(payload: InvitacionIn):
     except Exception as e:
         raise HTTPException(
             status_code=500,
-            detail=f"Error guardando invitación en BD: {str(e)}"
+            detail=f"Error guardando invitacion en BD: {str(e)}"
         )
 
     # ── Enviar correo con SMTP ───────────────────────────────
@@ -148,12 +148,12 @@ def invitar_instructor(payload: InvitacionIn):
     except Exception as e:
         raise HTTPException(
             status_code=500,
-            detail=f"Invitación guardada pero error enviando correo: {str(e)}"
+            detail=f"Invitacion guardada pero error enviando correo: {str(e)}"
         )
 
     return {
         "ok":      True,
-        "mensaje": f"✅ Invitación enviada al correo {payload.email}",
+        "mensaje": f"Invitacion enviada al correo {payload.email}",
         "token":   token,
         "link":    invite_link
     }
@@ -193,12 +193,12 @@ def validar_invitacion(token: str):
         if not row:
             raise HTTPException(
                 status_code=404,
-                detail="Invitación no encontrada."
+                detail="Invitacion no encontrada."
             )
         if row["usado"]:
             raise HTTPException(
                 status_code=400,
-                detail="Esta invitación ya fue utilizada."
+                detail="Esta invitacion ya fue utilizada."
             )
         return {
             "ok":     True,
@@ -211,7 +211,7 @@ def validar_invitacion(token: str):
     except Exception as e:
         raise HTTPException(
             status_code=500,
-            detail=f"Error validando invitación: {str(e)}"
+            detail=f"Error validando invitacion: {str(e)}"
         )
 
 
@@ -229,14 +229,14 @@ def marcar_usada(token: str):
         if result.rowcount == 0:
             raise HTTPException(
                 status_code=400,
-                detail="Token inválido o ya fue usado."
+                detail="Token invalido o ya fue usado."
             )
-        return {"ok": True, "mensaje": "Invitación marcada como usada."}
+        return {"ok": True, "mensaje": "Invitacion marcada como usada."}
 
     except HTTPException:
         raise
     except Exception as e:
         raise HTTPException(
             status_code=500,
-            detail=f"Error marcando invitación: {str(e)}"
+            detail=f"Error marcando invitacion: {str(e)}"
         )

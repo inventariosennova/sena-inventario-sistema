@@ -1,10 +1,7 @@
 # backend/app/routes/admin.py
 import os
 import uuid
-import smtplib
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
-from email.header import Header
+import requests
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
@@ -21,18 +18,13 @@ class InvitacionIn(BaseModel):
     nombre: str
 
 
-# ─── Utilidad: enviar email con SMTP (Gmail) ────────────────
-def enviar_email_smtp(to_email: str, nombre: str, invite_link: str):
-    host     = os.getenv("EMAIL_HOST", "smtp.gmail.com")
-    port     = int(os.getenv("EMAIL_PORT", "587"))        # ← CAMBIO 1: default 587
-    user     = os.getenv("EMAIL_USER")
-    password = os.getenv("EMAIL_PASS")
-    sender   = os.getenv("SENDER_EMAIL", user)
+# ─── Utilidad: enviar email con Brevo API ───────────────────
+def enviar_email_brevo(to_email: str, nombre: str, invite_link: str):
+    api_key      = os.getenv("BREVO_API_KEY")
+    sender_email = os.getenv("SENDER_EMAIL", "inventariosennova@gmail.com")
 
-    if not host or not user or not password:
-        raise RuntimeError(
-            "Faltan variables: EMAIL_HOST, EMAIL_USER o EMAIL_PASS"
-        )
+    if not api_key:
+        raise RuntimeError("Falta variable: BREVO_API_KEY")
 
     html_body = f"""
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: auto;">
@@ -90,18 +82,24 @@ def enviar_email_smtp(to_email: str, nombre: str, invite_link: str):
     </div>
     """
 
-    msg = MIMEMultipart("alternative")
-    msg["Subject"] = Header("Invitacion - Sistema Inventario SENA SENNOVA", "utf-8")
-    msg["From"]    = f"Sistema SENA <{sender}>"           # ← CAMBIO 2: formato Gmail
-    msg["To"]      = to_email
-    msg.attach(MIMEText(html_body, "html", "utf-8"))
+    response = requests.post(
+        "https://api.brevo.com/v3/smtp/email",
+        headers={
+            "accept":       "application/json",
+            "api-key":      api_key,
+            "content-type": "application/json"
+        },
+        json={
+            "sender":      {"name": "Sistema SENA", "email": sender_email},
+            "to":          [{"email": to_email, "name": nombre}],
+            "subject":     "Invitacion - Sistema Inventario SENA SENNOVA",
+            "htmlContent": html_body
+        },
+        timeout=30
+    )
 
-    with smtplib.SMTP(host, port, timeout=30) as server:
-        server.ehlo()
-        server.starttls()
-        server.ehlo()
-        server.login(user, password)
-        server.sendmail(sender, [to_email], msg.as_string())
+    if response.status_code not in (200, 201):
+        raise RuntimeError(f"Error Brevo: {response.status_code} - {response.text}")
 
 
 # ─── Endpoint 1: Crear invitación + enviar email ─────────────
@@ -141,9 +139,9 @@ def invitar_instructor(payload: InvitacionIn):
             detail=f"Error guardando invitacion en BD: {str(e)}"
         )
 
-    # ── Enviar correo con SMTP ───────────────────────────────
+    # ── Enviar correo con Brevo ──────────────────────────────
     try:
-        enviar_email_smtp(payload.email, payload.nombre, invite_link)
+        enviar_email_brevo(payload.email, payload.nombre, invite_link)
     except Exception as e:
         raise HTTPException(
             status_code=500,

@@ -212,6 +212,7 @@ def validar_invitacion(token: str):
         )
 
 
+
 # ─── Endpoint 4: Marcar como usada ──────────────────────────
 @router.post("/marcar-usada")
 def marcar_usada(token: str):

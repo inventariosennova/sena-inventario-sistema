@@ -231,6 +231,7 @@ def marcar_usada(token: str):
             )
         return {"ok": True, "mensaje": "Invitacion marcada como usada."}
 
+
     except HTTPException:
         raise
     except Exception as e:

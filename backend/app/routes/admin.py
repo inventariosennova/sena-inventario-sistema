@@ -21,10 +21,10 @@ class InvitacionIn(BaseModel):
     nombre: str
 
 
-# ─── Utilidad: enviar email con SMTP (Mailersend) ────────────
+# ─── Utilidad: enviar email con SMTP (Gmail) ────────────────
 def enviar_email_smtp(to_email: str, nombre: str, invite_link: str):
-    host     = os.getenv("EMAIL_HOST")
-    port     = int(os.getenv("EMAIL_PORT", "2525"))
+    host     = os.getenv("EMAIL_HOST", "smtp.gmail.com")
+    port     = int(os.getenv("EMAIL_PORT", "587"))        # ← CAMBIO 1: default 587
     user     = os.getenv("EMAIL_USER")
     password = os.getenv("EMAIL_PASS")
     sender   = os.getenv("SENDER_EMAIL", user)
@@ -92,12 +92,11 @@ def enviar_email_smtp(to_email: str, nombre: str, invite_link: str):
 
     msg = MIMEMultipart("alternative")
     msg["Subject"] = Header("Invitacion - Sistema Inventario SENA SENNOVA", "utf-8")
-    msg["From"]    = sender
+    msg["From"]    = f"Sistema SENA <{sender}>"           # ← CAMBIO 2: formato Gmail
     msg["To"]      = to_email
     msg.attach(MIMEText(html_body, "html", "utf-8"))
 
     with smtplib.SMTP(host, port, timeout=30) as server:
-        server.set_debuglevel(0)
         server.ehlo()
         server.starttls()
         server.ehlo()

@@ -1,88 +1,276 @@
-// Configuración API
-const API_URL = 'https://sena-inventario-sistema.onrender.com/api';
+// =============================================
+// CONFIGURACIÓN
+// =============================================
+const API_URL  = 'https://sena-inventario-sistema.onrender.com/api';
 const ADMIN_API = `${API_URL}/admin`;
+const AUTH_API  = `${API_URL}/auth`;
 
-// Variables globales
-let activos = [];
-let activoActual = null;
-let streamCamara = null;
-let fotosCamara = [];
+// =============================================
+// VARIABLES GLOBALES
+// =============================================
+let activos          = [];
+let activoActual     = null;
+let streamCamara     = null;
+let fotosCamara      = [];
 let imagenesExistentes = [];
-let imagenesNuevas = [];
-
-// Paginación básica en frontend
-const PAGE_SIZE = 10;
-let paginaActivos = 1;
-let paginaHistorial = 1;
-let historialActual = [];
+let imagenesNuevas   = [];
+const PAGE_SIZE      = 10;
+let paginaActivos    = 1;
+let paginaHistorial  = 1;
+let historialActual  = [];
 let tituloHistorialActual = '';
 
+// =============================================
+// AUTH — utilidades de sesión
+// =============================================
+function getToken()   { return localStorage.getItem('token'); }
+function getUsuario() {
+    const u = localStorage.getItem('usuario');
+    return u ? JSON.parse(u) : null;
+}
+function getRol()     { return getUsuario()?.rol || null; }
+function estaLogueado() { return !!getToken(); }
+function esAdmin()    { return getRol() === 'admin'; }
+function esUsuario()  { return getRol() === 'usuario'; }
+function puedeEditar(){ return estaLogueado(); } // admin o usuario
+
+function guardarSesion(data) {
+    localStorage.setItem('token', data.access_token);
+    localStorage.setItem('usuario', JSON.stringify({
+        email:  data.email,
+        nombre: data.nombre,
+        rol:    data.rol
+    }));
+}
+
+function cerrarSesion() {
+    localStorage.removeItem('token');
+    localStorage.removeItem('usuario');
+    actualizarNavbar();
+    renderizarTabla(activos);
+    mostrarExito('Sesión cerrada correctamente');
+}
+
+// Headers con token para requests protegidos
+function headersAuth() {
+    return {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${getToken()}`
+    };
+}
+
+// =============================================
+// NAVBAR — mostrar nombre/rol y botones
+// =============================================
+function actualizarNavbar() {
+    const usuario = getUsuario();
+    const btnLogin   = document.getElementById('btnLogin');
+    const btnCerrar  = document.getElementById('btnCerrarSesion');
+    const infoUsuario = document.getElementById('infoUsuario');
+    const btnAdmin   = document.getElementById('btnAbrirAdmin');
+
+    if (usuario) {
+        // Mostrar nombre y rol
+        if (infoUsuario) {
+            const badge = usuario.rol === 'admin'
+                ? `<span style="background:#39a900;color:white;padding:2px 8px;border-radius:10px;font-size:11px;">Admin</span>`
+                : `<span style="background:#007bff;color:white;padding:2px 8px;border-radius:10px;font-size:11px;">Usuario</span>`;
+            infoUsuario.innerHTML = `<i class="fas fa-user-circle"></i> ${usuario.nombre} ${badge}`;
+            infoUsuario.style.display = 'inline-flex';
+        }
+        if (btnLogin)  btnLogin.style.display  = 'none';
+        if (btnCerrar) btnCerrar.style.display = 'inline-flex';
+        // Botón admin solo visible para admin
+        if (btnAdmin)  btnAdmin.style.display  = usuario.rol === 'admin' ? 'inline-flex' : 'none';
+    } else {
+        if (infoUsuario) infoUsuario.style.display = 'none';
+        if (btnLogin)  btnLogin.style.display  = 'inline-flex';
+        if (btnCerrar) btnCerrar.style.display = 'none';
+        if (btnAdmin)  btnAdmin.style.display  = 'none';
+    }
+}
+
+// =============================================
+// DOMContentLoaded
+// =============================================
+document.addEventListener('DOMContentLoaded', () => {
+    actualizarNavbar();
+    iniciarApp();
+
+    // Detectar ?invite=TOKEN → abrir registro
+    const params = new URLSearchParams(window.location.search);
+    const inviteToken = params.get('invite');
+    if (inviteToken) {
+        abrirModalRegistro(inviteToken);
+    }
+
+    // Form Login usuario/admin
+    const loginForm = document.getElementById('loginForm');
+    if (loginForm) {
+        loginForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const email    = document.getElementById('loginEmail').value.trim();
+            const password = document.getElementById('loginPassword').value.trim();
+            await hacerLogin(email, password);
+        });
+    }
+
+    // Form Registro con invitación
+    const registroForm = document.getElementById('registroForm');
+    if (registroForm) {
+        registroForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            await hacerRegistro();
+        });
+    }
+});
+
+// =============================================
+// LOGIN
+// =============================================
+function abrirModalLogin() {
+    document.getElementById('modalLogin').style.display = 'block';
+}
+function cerrarModalLogin() {
+    document.getElementById('modalLogin').style.display = 'none';
+    document.getElementById('loginForm').reset();
+    document.getElementById('loginError').style.display = 'none';
+}
+
+async function hacerLogin(email, password) {
+    try {
+        const res = await fetch(`${AUTH_API}/login`, {
+            method:  'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body:    JSON.stringify({ email, password })
+        });
+        const data = await res.json();
+
+        if (!res.ok) {
+            document.getElementById('loginError').textContent = data.detail || 'Credenciales incorrectas';
+            document.getElementById('loginError').style.display = 'block';
+            return;
+        }
+
+        guardarSesion(data);
+        cerrarModalLogin();
+        actualizarNavbar();
+        renderizarTabla(activos);
+        mostrarExito(`¡Bienvenido(a) ${data.nombre}!`);
+
+        // Si es admin, abrir panel admin automáticamente
+        if (data.rol === 'admin') {
+            abrirModalInvitaciones();
+            await cargarInvitacionesAdmin();
+        }
+
+    } catch (err) {
+        document.getElementById('loginError').textContent = 'Error de conexión';
+        document.getElementById('loginError').style.display = 'block';
+    }
+}
+
+// =============================================
+// REGISTRO (con token de invitación)
+// =============================================
+function abrirModalRegistro(token) {
+    // Primero validar el token antes de mostrar el modal
+    fetch(`${ADMIN_API}/validar-invitacion?token=${encodeURIComponent(token)}`)
+        .then(r => r.json())
+        .then(data => {
+            if (!data.ok) {
+                alert('❌ Invitación inválida o ya utilizada');
+                return;
+            }
+            // Mostrar email fijo (no editable) y pedir solo contraseña
+            document.getElementById('registroEmail').value  = data.email;
+            document.getElementById('registroNombre').value = data.nombre;
+            document.getElementById('registroToken').value  = token;
+            document.getElementById('modalRegistro').style.display = 'block';
+
+            // Limpiar token de la URL
+            const url = new URL(window.location.href);
+            url.searchParams.delete('invite');
+            window.history.replaceState({}, '', url.toString());
+        })
+        .catch(() => alert('❌ Error validando la invitación'));
+}
+
+function cerrarModalRegistro() {
+    document.getElementById('modalRegistro').style.display = 'none';
+    document.getElementById('registroError').style.display = 'none';
+}
+
+async function hacerRegistro() {
+    const token    = document.getElementById('registroToken').value;
+    const password = document.getElementById('registroPassword').value;
+    const confirm  = document.getElementById('registroConfirm').value;
+
+    if (password.length < 6) {
+        document.getElementById('registroError').textContent = 'La contraseña debe tener al menos 6 caracteres';
+        document.getElementById('registroError').style.display = 'block';
+        return;
+    }
+    if (password !== confirm) {
+        document.getElementById('registroError').textContent = 'Las contraseñas no coinciden';
+        document.getElementById('registroError').style.display = 'block';
+        return;
+    }
+
+    try {
+        const res = await fetch(`${AUTH_API}/registro`, {
+            method:  'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body:    JSON.stringify({ token_invitacion: token, password })
+        });
+        const data = await res.json();
+
+        if (!res.ok) {
+            document.getElementById('registroError').textContent = data.detail || 'Error al registrar';
+            document.getElementById('registroError').style.display = 'block';
+            return;
+        }
+
+        cerrarModalRegistro();
+        mostrarExito('¡Cuenta creada! Ahora inicia sesión con tu correo y contraseña.');
+        abrirModalLogin();
+
+    } catch (err) {
+        document.getElementById('registroError').textContent = 'Error de conexión';
+        document.getElementById('registroError').style.display = 'block';
+    }
+}
+
+// =============================================
+// APP PRINCIPAL
+// =============================================
 function iniciarApp() {
     cargarActivos();
     cargarResponsables();
     cargarUbicaciones();
 }
 
-// Cargar activos al iniciar la aplicación
-document.addEventListener('DOMContentLoaded', () => {
-    iniciarApp();
-
-    // Login Admin Form
-    const adminForm = document.getElementById('adminLoginForm');
-    if (adminForm) {
-        adminForm.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const correo = document.getElementById('adminCorreo').value.trim();
-            const clave  = document.getElementById('adminClave').value.trim();
-
-            // ✅ DESPUÉS (tus valores reales de Render)
-                const adminEmail = 'inventariosennova@gmail.com';
-                const adminPass  = 'Sennova12.';
-            // ← mismo valor que pusiste en Render ADMIN_PASS
-
-            if (correo === adminEmail && clave === adminPass) {
-                sessionStorage.setItem('admin_ok', 'true');
-                cerrarModalAdmin();
-                abrirModalInvitaciones();
-                await cargarInvitacionesAdmin();
-            } else {
-                alert('❌ Correo o contraseña incorrectos');
-            }
-        });
-    }
-
-    // Si el instructor llega con un link de invitación (?invite=TOKEN)
-    const params = new URLSearchParams(window.location.search);
-    const inviteToken = params.get('invite');
-    if (inviteToken) {
-        validarInvitacion(inviteToken);
-    }
-});
-
-// ─── Cargar activos ──────────────────────────────────────────
 async function cargarActivos(filtros = {}) {
     try {
         let url = `${API_URL}/activos?`;
-        if (filtros.placa)      url += `placa=${encodeURIComponent(filtros.placa)}&`;
-        if (filtros.cedula)     url += `cedula=${encodeURIComponent(filtros.cedula)}&`;
+        if (filtros.placa)       url += `placa=${encodeURIComponent(filtros.placa)}&`;
+        if (filtros.cedula)      url += `cedula=${encodeURIComponent(filtros.cedula)}&`;
         if (filtros.responsable) url += `responsable=${encodeURIComponent(filtros.responsable)}&`;
-        if (filtros.ubicacion)  url += `ubicacion=${encodeURIComponent(filtros.ubicacion)}&`;
-
+        if (filtros.ubicacion)   url += `ubicacion=${encodeURIComponent(filtros.ubicacion)}&`;
         const response = await fetch(url);
         const data = await response.json();
-
         activos = data.activos;
         paginaActivos = 1;
         renderizarTabla(activos);
         actualizarContador(data.total);
     } catch (error) {
-        console.error('Error cargando activos:', error);
-        const detalle = (error && error.message) ? `: ${error.message}` : '';
-        mostrarError('Error al cargar los datos del inventario' + detalle);
+        mostrarError('Error al cargar los datos del inventario');
     }
 }
 
-// ─── Renderizar tabla ────────────────────────────────────────
+// =============================================
+// TABLA — botones según rol
+// =============================================
 function renderizarTabla(datos) {
     const tbody = document.getElementById('inventoryTableBody');
     const paginationDiv = document.getElementById('pagination');
@@ -107,6 +295,21 @@ function renderizarTabla(datos) {
     tbody.innerHTML = visibles.map(activo => {
         const desc = activo.descripcion || '';
         const descripcionCorta = desc.length > 80 ? desc.substring(0, 80) + '…' : desc;
+
+        // Botón editar: solo si puede editar
+        const btnEditar = puedeEditar()
+            ? `<button class="btn btn-edit" onclick="editarActivo(${activo.id})" title="Editar">
+                   <i class="fas fa-edit"></i>
+               </button>`
+            : '';
+
+        // Botón eliminar: solo admin
+        const btnEliminar = esAdmin()
+            ? `<button class="btn btn-danger" onclick="eliminarActivo(${activo.id})" title="Eliminar">
+                   <i class="fas fa-trash"></i>
+               </button>`
+            : '';
+
         return `
         <tr>
             <td><strong>${activo.placa}</strong></td>
@@ -123,9 +326,8 @@ function renderizarTabla(datos) {
                 <button class="btn btn-view" onclick="verActivo(${activo.id})" title="Ver detalles">
                     <i class="fas fa-eye"></i>
                 </button>
-                <button class="btn btn-edit" onclick="editarActivo(${activo.id})" title="Editar">
-                    <i class="fas fa-edit"></i>
-                </button>
+                ${btnEditar}
+                ${btnEliminar}
             </td>
         </tr>`;
     }).join('');
@@ -137,99 +339,22 @@ function renderizarTabla(datos) {
     }
 }
 
-function verMasActivos() {
-    paginaActivos += 1;
-    renderizarTabla(activos);
-}
+function verMasActivos() { paginaActivos += 1; renderizarTabla(activos); }
 
-// ─── Contador ────────────────────────────────────────────────
 function actualizarContador(total) {
     const countElement = document.getElementById('resultsCount');
     const mostrados = Math.min(activos.length, paginaActivos * PAGE_SIZE);
     countElement.textContent = `Mostrando ${mostrados} de ${total} activos`;
 }
 
-// ─── Cargar responsables ─────────────────────────────────────
-async function cargarResponsables() {
-    try {
-        const response = await fetch(`${API_URL}/activos?limit=1000`);
-        const data = await response.json();
-        const responsables = [...new Set(data.activos.map(a => a.responsable))];
-        const select = document.getElementById('searchResponsable');
-        responsables.forEach(resp => {
-            const option = document.createElement('option');
-            option.value = resp;
-            option.textContent = resp;
-            select.appendChild(option);
-        });
-    } catch (error) {
-        console.error('Error cargando responsables:', error);
-    }
-}
-
-// ─── Cargar ubicaciones ──────────────────────────────────────
-async function cargarUbicaciones() {
-    try {
-        const response = await fetch(`${API_URL}/activos?limit=1000`);
-        const data = await response.json();
-        const ubicaciones = [...new Set(data.activos.map(a => a.ubicacion).filter(u => u))];
-        const select = document.getElementById('searchUbicacion');
-        ubicaciones.forEach(ubi => {
-            const option = document.createElement('option');
-            option.value = ubi;
-            option.textContent = ubi;
-            select.appendChild(option);
-        });
-    } catch (error) {
-        console.error('Error cargando ubicaciones:', error);
-    }
-}
-
-// ─── Buscar / Limpiar ────────────────────────────────────────
-function buscarActivos() {
-    const filtros = {};
-    const placa = document.getElementById('searchPlaca').value;
-    const cedula = document.getElementById('searchCedula').value;
-    const responsable = document.getElementById('searchResponsable').value;
-    const ubicacion = document.getElementById('searchUbicacion').value;
-    if (placa) filtros.placa = placa;
-    if (cedula) filtros.cedula = cedula;
-    if (responsable) filtros.responsable = responsable;
-    if (ubicacion) filtros.ubicacion = ubicacion;
-    cargarActivos(filtros);
-}
-
-function limpiarFiltros() {
-    document.getElementById('searchPlaca').value = '';
-    document.getElementById('searchCedula').value = '';
-    document.getElementById('searchResponsable').value = '';
-    if (document.getElementById('searchUbicacion')) {
-        document.getElementById('searchUbicacion').value = '';
-    }
-    cargarActivos();
-}
-
-// ─── Exportar Excel ──────────────────────────────────────────
-async function exportarExcel() {
-    try {
-        const response = await fetch(`${API_URL}/exportar/excel`);
-        if (!response.ok) throw new Error('No se pudo generar el archivo de Excel');
-        const blob = await response.blob();
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = 'activos_sena.xlsx';
-        document.body.appendChild(a);
-        a.click();
-        a.remove();
-        window.URL.revokeObjectURL(url);
-    } catch (error) {
-        mostrarError('Error al exportar a Excel');
-    }
-}
-
-// ─── Modal Crear ─────────────────────────────────────────────
+// =============================================
+// CREAR / EDITAR (requiere login)
+// =============================================
 function mostrarModalCrear() {
+    if (!puedeEditar()) {
+        abrirModalLogin();
+        return;
+    }
     activoActual = null;
     imagenesExistentes = [];
     imagenesNuevas = [];
@@ -242,40 +367,8 @@ function mostrarModalCrear() {
     document.getElementById('modal').style.display = 'block';
 }
 
-// ─── Ver detalles ────────────────────────────────────────────
-async function verActivo(id) {
-    try {
-        const response = await fetch(`${API_URL}/activos/${id}`);
-        const activo = await response.json();
-        const imagenesHtml = activo.imagenes && activo.imagenes.length > 0
-            ? activo.imagenes.map(img => `
-                <img src="${img}" alt="Imagen activo"
-                     style="max-width:200px; border-radius:8px; margin:5px;">`
-              ).join('')
-            : '<p style="color:#999;">No hay imágenes disponibles</p>';
-
-        document.getElementById('detalleContent').innerHTML = `
-            <div style="display:grid; gap:1.5rem;">
-                <div class="detail-row"><strong><i class="fas fa-barcode"></i> Placa:</strong> <span>${activo.placa}</span></div>
-                <div class="detail-row"><strong><i class="fas fa-align-left"></i> Descripción:</strong> <span>${activo.descripcion}</span></div>
-                <div class="detail-row"><strong><i class="fas fa-cube"></i> Modelo:</strong> <span>${activo.modelo || 'N/A'}</span></div>
-                <div class="detail-row"><strong><i class="fas fa-user"></i> Responsable:</strong> <span>${activo.responsable}</span></div>
-                <div class="detail-row"><strong><i class="fas fa-id-card"></i> Cédula:</strong> <span>${activo.cedula_responsable || 'N/A'}</span></div>
-                <div class="detail-row"><strong><i class="fas fa-map-marker-alt"></i> Ubicación:</strong> <span>${activo.ubicacion || 'N/A'}</span></div>
-                <div class="detail-row"><strong><i class="fas fa-calendar"></i> Fecha:</strong> <span>${new Date(activo.created_at).toLocaleString('es-CO')}</span></div>
-                <div class="detail-images">
-                    <strong><i class="fas fa-images"></i> Imágenes:</strong>
-                    <div style="display:flex; flex-wrap:wrap; gap:10px; margin-top:10px;">${imagenesHtml}</div>
-                </div>
-            </div>`;
-        document.getElementById('modalVer').style.display = 'block';
-    } catch (error) {
-        mostrarError('Error al cargar los detalles del activo');
-    }
-}
-
-// ─── Editar activo ───────────────────────────────────────────
 async function editarActivo(id) {
+    if (!puedeEditar()) { abrirModalLogin(); return; }
     try {
         const response = await fetch(`${API_URL}/activos/${id}`);
         const activo = await response.json();
@@ -308,27 +401,13 @@ async function editarActivo(id) {
     }
 }
 
-// ─── Cerrar modales ──────────────────────────────────────────
-function cerrarModal()          { document.getElementById('modal').style.display = 'none'; }
-function cerrarModalVer()       { document.getElementById('modalVer').style.display = 'none'; }
-function cerrarModalHistorial() { document.getElementById('modalHistorial').style.display = 'none'; }
-
-// ─── Click fuera = cerrar ────────────────────────────────────
-window.onclick = function(event) {
-    const ids = ['modal','modalVer','modalHistorial','modalCamara',
-                 'modalAdminLogin','modalInvitaciones'];
-    ids.forEach(id => {
-        const el = document.getElementById(id);
-        if (event.target === el) {
-            if (id === 'modalCamara') { cerrarCamara(); }
-            else { el.style.display = 'none'; }
-        }
-    });
-};
-
-// ─── Formulario guardar activo ───────────────────────────────
+// =============================================
+// FORMULARIO GUARDAR (con token en headers)
+// =============================================
 document.getElementById('activoForm').addEventListener('submit', async (e) => {
     e.preventDefault();
+    if (!puedeEditar()) { cerrarModal(); abrirModalLogin(); return; }
+
     const activoId = document.getElementById('activoId').value;
     const formData = new FormData();
     formData.append('placa',              document.getElementById('placa').value);
@@ -355,9 +434,14 @@ document.getElementById('activoForm').addEventListener('submit', async (e) => {
     try {
         const url    = activoId ? `${API_URL}/activos/${activoId}` : `${API_URL}/activos`;
         const method = activoId ? 'PUT' : 'POST';
-        const response = await fetch(url, { method, body: formData });
+        const response = await fetch(url, {
+            method,
+            body: formData,
+            headers: { 'Authorization': `Bearer ${getToken()}` }  // token aquí
+        });
         if (!response.ok) {
             const err = await response.json();
+            if (response.status === 401) { cerrarModal(); abrirModalLogin(); return; }
             throw new Error(err.detail || 'Error al guardar');
         }
         mostrarExito(activoId ? 'Activo actualizado exitosamente' : 'Activo creado exitosamente');
@@ -368,7 +452,156 @@ document.getElementById('activoForm').addEventListener('submit', async (e) => {
     }
 });
 
-// ─── Historial general ───────────────────────────────────────
+// =============================================
+// ELIMINAR (solo admin)
+// =============================================
+async function eliminarActivo(id) {
+    if (!esAdmin()) { mostrarError('Solo el admin puede eliminar activos'); return; }
+    if (!confirm('¿Estás seguro de eliminar este activo?')) return;
+    try {
+        const res = await fetch(`${API_URL}/activos/${id}`, {
+            method:  'DELETE',
+            headers: headersAuth()
+        });
+        if (!res.ok) {
+            const err = await res.json();
+            throw new Error(err.detail || 'Error al eliminar');
+        }
+        mostrarExito('Activo eliminado exitosamente');
+        cargarActivos();
+    } catch (err) {
+        mostrarError(err.message);
+    }
+}
+
+// =============================================
+// VER DETALLES
+// =============================================
+async function verActivo(id) {
+    try {
+        const response = await fetch(`${API_URL}/activos/${id}`);
+        const activo = await response.json();
+        const imagenesHtml = activo.imagenes && activo.imagenes.length > 0
+            ? activo.imagenes.map(img =>
+                `<img src="${img}" alt="Imagen activo"
+                      style="max-width:200px;border-radius:8px;margin:5px;">`
+              ).join('')
+            : '<p style="color:#999;">No hay imágenes disponibles</p>';
+
+        document.getElementById('detalleContent').innerHTML = `
+            <div style="display:grid;gap:1.5rem;">
+                <div class="detail-row"><strong><i class="fas fa-barcode"></i> Placa:</strong> <span>${activo.placa}</span></div>
+                <div class="detail-row"><strong><i class="fas fa-align-left"></i> Descripción:</strong> <span>${activo.descripcion}</span></div>
+                <div class="detail-row"><strong><i class="fas fa-cube"></i> Modelo:</strong> <span>${activo.modelo || 'N/A'}</span></div>
+                <div class="detail-row"><strong><i class="fas fa-user"></i> Responsable:</strong> <span>${activo.responsable}</span></div>
+                <div class="detail-row"><strong><i class="fas fa-id-card"></i> Cédula:</strong> <span>${activo.cedula_responsable || 'N/A'}</span></div>
+                <div class="detail-row"><strong><i class="fas fa-map-marker-alt"></i> Ubicación:</strong> <span>${activo.ubicacion || 'N/A'}</span></div>
+                <div class="detail-row"><strong><i class="fas fa-calendar"></i> Fecha:</strong> <span>${new Date(activo.created_at).toLocaleString('es-CO')}</span></div>
+                <div class="detail-images">
+                    <strong><i class="fas fa-images"></i> Imágenes:</strong>
+                    <div style="display:flex;flex-wrap:wrap;gap:10px;margin-top:10px;">${imagenesHtml}</div>
+                </div>
+            </div>`;
+        document.getElementById('modalVer').style.display = 'block';
+    } catch (error) {
+        mostrarError('Error al cargar los detalles del activo');
+    }
+}
+
+// =============================================
+// RESPONSABLES Y UBICACIONES
+// =============================================
+async function cargarResponsables() {
+    try {
+        const response = await fetch(`${API_URL}/activos?limit=1000`);
+        const data = await response.json();
+        const responsables = [...new Set(data.activos.map(a => a.responsable))];
+        const select = document.getElementById('searchResponsable');
+        responsables.forEach(resp => {
+            const option = document.createElement('option');
+            option.value = resp; option.textContent = resp;
+            select.appendChild(option);
+        });
+    } catch (error) { console.error('Error cargando responsables:', error); }
+}
+
+async function cargarUbicaciones() {
+    try {
+        const response = await fetch(`${API_URL}/activos?limit=1000`);
+        const data = await response.json();
+        const ubicaciones = [...new Set(data.activos.map(a => a.ubicacion).filter(u => u))];
+        const select = document.getElementById('searchUbicacion');
+        ubicaciones.forEach(ubi => {
+            const option = document.createElement('option');
+            option.value = ubi; option.textContent = ubi;
+            select.appendChild(option);
+        });
+    } catch (error) { console.error('Error cargando ubicaciones:', error); }
+}
+
+// =============================================
+// BÚSQUEDA Y FILTROS
+// =============================================
+function buscarActivos() {
+    const filtros = {};
+    const placa       = document.getElementById('searchPlaca').value;
+    const cedula      = document.getElementById('searchCedula').value;
+    const responsable = document.getElementById('searchResponsable').value;
+    const ubicacion   = document.getElementById('searchUbicacion').value;
+    if (placa)       filtros.placa = placa;
+    if (cedula)      filtros.cedula = cedula;
+    if (responsable) filtros.responsable = responsable;
+    if (ubicacion)   filtros.ubicacion = ubicacion;
+    cargarActivos(filtros);
+}
+
+function limpiarFiltros() {
+    document.getElementById('searchPlaca').value = '';
+    document.getElementById('searchCedula').value = '';
+    document.getElementById('searchResponsable').value = '';
+    if (document.getElementById('searchUbicacion'))
+        document.getElementById('searchUbicacion').value = '';
+    cargarActivos();
+}
+
+// =============================================
+// EXCEL
+// =============================================
+async function exportarExcel() {
+    try {
+        const response = await fetch(`${API_URL}/exportar/excel`);
+        if (!response.ok) throw new Error('No se pudo generar el archivo');
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url; a.download = 'activos_sena.xlsx';
+        document.body.appendChild(a); a.click(); a.remove();
+        window.URL.revokeObjectURL(url);
+    } catch (error) { mostrarError('Error al exportar a Excel'); }
+}
+
+// =============================================
+// CERRAR MODALES
+// =============================================
+function cerrarModal()          { document.getElementById('modal').style.display = 'none'; }
+function cerrarModalVer()       { document.getElementById('modalVer').style.display = 'none'; }
+function cerrarModalHistorial() { document.getElementById('modalHistorial').style.display = 'none'; }
+
+window.onclick = function(event) {
+    const ids = ['modal','modalVer','modalHistorial','modalCamara',
+                 'modalLogin','modalRegistro','modalInvitaciones'];
+    ids.forEach(id => {
+        const el = document.getElementById(id);
+        if (event.target === el) {
+            if (id === 'modalCamara') cerrarCamara();
+            else el.style.display = 'none';
+        }
+    });
+};
+
+// =============================================
+// HISTORIAL
+// =============================================
 async function mostrarHistorialGeneral() {
     try {
         const response = await fetch(`${API_URL}/historial`);
@@ -377,9 +610,7 @@ async function mostrarHistorialGeneral() {
         paginaHistorial = 1;
         renderizarHistorialPagina();
         document.getElementById('modalHistorial').style.display = 'block';
-    } catch (error) {
-        mostrarError('Error al cargar el historial general');
-    }
+    } catch (error) { mostrarError('Error al cargar el historial'); }
 }
 
 async function mostrarHistorialPorActivo(id, placa) {
@@ -390,16 +621,13 @@ async function mostrarHistorialPorActivo(id, placa) {
         paginaHistorial = 1;
         renderizarHistorialPagina();
         document.getElementById('modalHistorial').style.display = 'block';
-    } catch (error) {
-        mostrarError('Error al cargar el historial del activo');
-    }
+    } catch (error) { mostrarError('Error al cargar el historial del activo'); }
 }
 
 function renderizarHistorialPagina() {
     const cont = document.getElementById('historialContent');
     if (!historialActual || historialActual.length === 0) {
-        cont.innerHTML = '<p>No hay registros de historial para mostrar.</p>';
-        return;
+        cont.innerHTML = '<p>No hay registros de historial.</p>'; return;
     }
     const end = paginaHistorial * PAGE_SIZE;
     const filas = historialActual.slice(0, end).map(h => `
@@ -410,20 +638,18 @@ function renderizarHistorialPagina() {
             <td>${h.descripcion_cambio}</td>
             <td>${h.fecha_cambio ? new Date(h.fecha_cambio).toLocaleString('es-CO') : ''}</td>
         </tr>`).join('');
-
     const botonVerMas = historialActual.length > end
-        ? `<div style="text-align:center; margin-top:1rem;">
+        ? `<div style="text-align:center;margin-top:1rem;">
                <button class="btn btn-secondary" onclick="verMasHistorial()">Ver más</button>
            </div>` : '';
-
     cont.innerHTML = `
         <h3 style="margin-bottom:1rem;">${tituloHistorialActual}</h3>
-        <div class="table-container" style="max-height:60vh; overflow-y:auto;">
+        <div class="table-container" style="max-height:60vh;overflow-y:auto;">
             <table class="inventory-table">
                 <thead>
                     <tr>
                         <th>Placa</th><th>Responsable</th>
-                        <th>Acción</th><th>Descripción cambio</th><th>Fecha</th>
+                        <th>Acción</th><th>Descripción</th><th>Fecha</th>
                     </tr>
                 </thead>
                 <tbody>${filas}</tbody>
@@ -431,12 +657,11 @@ function renderizarHistorialPagina() {
         </div>${botonVerMas}`;
 }
 
-function verMasHistorial() {
-    paginaHistorial += 1;
-    renderizarHistorialPagina();
-}
+function verMasHistorial() { paginaHistorial += 1; renderizarHistorialPagina(); }
 
-// ─── Preview imágenes ────────────────────────────────────────
+// =============================================
+// PREVIEW IMÁGENES
+// =============================================
 const inputImagenes = document.getElementById('imagenes');
 if (inputImagenes) {
     inputImagenes.addEventListener('change', (e) => {
@@ -466,40 +691,36 @@ if (previewContainer) {
         if (!e.target.classList.contains('btn-mini-delete')) return;
         const type  = e.target.getAttribute('data-type');
         const index = parseInt(e.target.getAttribute('data-index'), 10);
-        if (type === 'existing') imagenesExistentes[index] = null;
-        else if (type === 'new')  imagenesNuevas[index] = null;
+        if (type === 'existing')    imagenesExistentes[index] = null;
+        else if (type === 'new')    imagenesNuevas[index] = null;
         else if (type === 'camera') fotosCamara[index] = null;
         e.target.parentElement.remove();
     });
 }
 
-// ─── Cámara ──────────────────────────────────────────────────
+// =============================================
+// CÁMARA
+// =============================================
 async function abrirCamara() {
     try {
-        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-            alert('La cámara no es compatible en este navegador/dispositivo');
-            return;
+        if (!navigator.mediaDevices?.getUserMedia) {
+            alert('La cámara no es compatible en este navegador'); return;
         }
         streamCamara = await navigator.mediaDevices.getUserMedia({ video: true });
         document.getElementById('videoCamara').srcObject = streamCamara;
         document.getElementById('modalCamara').style.display = 'block';
-    } catch (error) {
-        mostrarError('No se pudo acceder a la cámara');
-    }
+    } catch (error) { mostrarError('No se pudo acceder a la cámara'); }
 }
 
 function cerrarCamara() {
     const modal = document.getElementById('modalCamara');
     if (modal) modal.style.display = 'none';
-    if (streamCamara) {
-        streamCamara.getTracks().forEach(t => t.stop());
-        streamCamara = null;
-    }
+    if (streamCamara) { streamCamara.getTracks().forEach(t => t.stop()); streamCamara = null; }
 }
 
 function capturarFoto() {
-    const video   = document.getElementById('videoCamara');
-    const canvas  = document.getElementById('canvasCamara');
+    const video = document.getElementById('videoCamara');
+    const canvas = document.getElementById('canvasCamara');
     const context = canvas.getContext('2d');
     canvas.width  = video.videoWidth  || 640;
     canvas.height = video.videoHeight || 480;
@@ -519,22 +740,14 @@ function capturarFoto() {
     }, 'image/png');
 }
 
-// ─── Auxiliares ──────────────────────────────────────────────
-function mostrarExito(mensaje) { alert('✅ ' + mensaje); }
-function mostrarError(mensaje)  { alert('❌ Error: ' + mensaje); }
-
-
 // =============================================
-// ========== SISTEMA ADMIN ================
+// PANEL ADMIN
 // =============================================
-
 function abrirModalAdmin() {
-    document.getElementById('modalAdminLogin').style.display = 'block';
-}
-
-function cerrarModalAdmin() {
-    document.getElementById('modalAdminLogin').style.display = 'none';
-    document.getElementById('adminLoginForm').reset();
+    // Admin entra directo por login normal — este botón abre el panel si ya es admin
+    if (!esAdmin()) { abrirModalLogin(); return; }
+    abrirModalInvitaciones();
+    cargarInvitacionesAdmin();
 }
 
 function abrirModalInvitaciones() {
@@ -544,127 +757,72 @@ function abrirModalInvitaciones() {
 function cerrarModalInvitaciones() {
     document.getElementById('modalInvitaciones').style.display = 'none';
     document.getElementById('invLinkBox').style.display = 'none';
-    sessionStorage.removeItem('admin_ok');
 }
 
-// ─── Enviar / crear invitación ───────────────────────────────
 async function enviarInvitacionAdmin() {
     const email  = document.getElementById('invEmail').value.trim();
     const nombre = document.getElementById('invNombre').value.trim();
-
-    if (!email || !nombre) {
-        return alert('❌ Completa el correo y el nombre del instructor');
-    }
-
+    if (!email || !nombre) { alert('❌ Completa el correo y nombre'); return; }
     try {
         const res = await fetch(`${ADMIN_API}/invitar`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ email, nombre })
+            method:  'POST',
+            headers: headersAuth(),
+            body:    JSON.stringify({ email, nombre })
         });
-
         const data = await res.json();
         if (!res.ok) throw new Error(data.detail || 'No se pudo crear la invitación');
-
-        // Mostrar caja con el link generado
         document.getElementById('invLinkTexto').value = data.link;
         document.getElementById('invLinkBox').style.display = 'block';
-
-        // Limpiar campos
         document.getElementById('invEmail').value  = '';
         document.getElementById('invNombre').value = '';
-
-        // Recargar lista
         await cargarInvitacionesAdmin();
-
-    } catch (err) {
-        alert('❌ Error: ' + err.message);
-    }
+    } catch (err) { alert('❌ Error: ' + err.message); }
 }
 
-// ─── Copiar link al portapapeles ─────────────────────────────
 function copiarLink() {
     const input = document.getElementById('invLinkTexto');
     input.select();
-    input.setSelectionRange(0, 99999);
     navigator.clipboard.writeText(input.value)
-        .then(() => alert('✅ Link copiado al portapapeles'))
-        .catch(() => {
-            document.execCommand('copy');
-            alert('✅ Link copiado');
-        });
+        .then(() => alert('✅ Link copiado'))
+        .catch(() => { document.execCommand('copy'); alert('✅ Link copiado'); });
 }
 
-// ─── Cargar lista de invitaciones ────────────────────────────
 async function cargarInvitacionesAdmin() {
     const cont = document.getElementById('listaInvitaciones');
     if (!cont) return;
-
     try {
-        const res  = await fetch(`${ADMIN_API}/invitaciones`);
+        const res  = await fetch(`${ADMIN_API}/invitaciones`, { headers: headersAuth() });
         const data = await res.json();
-
         if (!Array.isArray(data) || data.length === 0) {
-            cont.innerHTML = '<p style="color:#999;">No hay invitaciones aún.</p>';
-            return;
+            cont.innerHTML = '<p style="color:#999;">No hay invitaciones aún.</p>'; return;
         }
-
         const filas = data.map(inv => `
             <tr>
                 <td>${inv.nombre || ''}</td>
                 <td>${inv.email}</td>
                 <td>
-                    <span style="
-                        padding: 4px 10px; border-radius: 12px; font-size: 12px;
-                        background: ${inv.usado ? '#d4edda' : '#fff3cd'};
-                        color: ${inv.usado ? '#155724' : '#856404'};">
+                    <span style="padding:4px 10px;border-radius:12px;font-size:12px;
+                        background:${inv.usado ? '#d4edda' : '#fff3cd'};
+                        color:${inv.usado ? '#155724' : '#856404'};">
                         ${inv.usado ? '✅ Usado' : '⏳ Pendiente'}
                     </span>
                 </td>
-                <td>${inv.created_at
-                    ? new Date(inv.created_at).toLocaleString('es-CO')
-                    : ''}</td>
+                <td>${inv.created_at ? new Date(inv.created_at).toLocaleString('es-CO') : ''}</td>
             </tr>`).join('');
-
         cont.innerHTML = `
-            <div class="table-container" style="max-height:300px; overflow-y:auto;">
+            <div class="table-container" style="max-height:300px;overflow-y:auto;">
                 <table class="inventory-table">
                     <thead>
-                        <tr>
-                            <th>Nombre</th>
-                            <th>Correo</th>
-                            <th>Estado</th>
-                            <th>Fecha</th>
-                        </tr>
+                        <tr><th>Nombre</th><th>Correo</th><th>Estado</th><th>Fecha</th></tr>
                     </thead>
                     <tbody>${filas}</tbody>
                 </table>
             </div>`;
-    } catch (err) {
-        cont.innerHTML = '<p style="color:#999;">Error cargando invitaciones.</p>';
-    }
+    } catch (err) { cont.innerHTML = '<p style="color:#999;">Error cargando invitaciones.</p>'; }
 }
 
-// ─── Validar token de invitación (cuando instructor abre link) ──
-async function validarInvitacion(token) {
-    try {
-        const res  = await fetch(`${ADMIN_API}/validar-invitacion?token=${encodeURIComponent(token)}`);
-        const data = await res.json();
-
-        if (!res.ok) throw new Error(data.detail || 'Invitación inválida');
-
-        // Marcar como usada
-        await fetch(`${ADMIN_API}/marcar-usada?token=${encodeURIComponent(token)}`,
-            { method: 'POST' });
-
-        // Limpiar token de la URL
-        const url = new URL(window.location.href);
-        url.searchParams.delete('invite');
-        window.history.replaceState({}, '', url.toString());
-
-        alert(`✅ ¡Bienvenido(a) ${data.nombre}!\nYa tienes acceso al sistema de inventario SENA.`);
-
-    } catch (err) {
-        alert('❌ ' + err.message);
-    }
-}
+// =============================================
+// AUXILIARES
+// =============================================
+function mostrarExito(mensaje) { alert('✅ ' + mensaje); }
+function mostrarError(mensaje)  { alert('❌ Error: ' + mensaje); }

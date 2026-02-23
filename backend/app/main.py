@@ -20,6 +20,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+from app.routes.auth import router as auth_router
+app.include_router(auth_router)
+
+
 
 # Crear carpeta uploads si no existe
 Path("uploads").mkdir(exist_ok=True)

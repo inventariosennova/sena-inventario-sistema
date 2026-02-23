@@ -21,13 +21,32 @@
                 <button class="btn-icon" title="Notificaciones">
                     <i class="fas fa-bell"></i>
                 </button>
-                <!-- 👤 BOTÓN MODIFICADO → abre login admin -->
-                <button class="btn-icon" title="Admin" onclick="abrirModalAdmin()">
+
+                <!-- Info del usuario logueado -->
+                <span id="infoUsuario" style="display:none; align-items:center; gap:8px;
+                    color:white; font-size:14px; font-weight:500;"></span>
+
+                <!-- Botón Login (visible si NO está logueado) -->
+                <button id="btnLogin" class="btn-icon" title="Iniciar sesión"
+                    onclick="abrirModalLogin()" style="display:inline-flex;">
+                    <i class="fas fa-sign-in-alt"></i>
+                </button>
+
+                <!-- Botón Cerrar sesión (visible si está logueado) -->
+                <button id="btnCerrarSesion" class="btn-icon" title="Cerrar sesión"
+                    onclick="cerrarSesion()" style="display:none;">
+                    <i class="fas fa-sign-out-alt"></i>
+                </button>
+
+                <!-- Botón Panel Admin (visible solo si es admin) -->
+                <button id="btnAbrirAdmin" class="btn-icon" title="Panel Admin"
+                    onclick="abrirModalAdmin()" style="display:none;">
                     <i class="fas fa-user-shield"></i>
                 </button>
             </div>
         </div>
     </header>
+
 
     <main class="container">
         <!-- Sección de Búsqueda -->
@@ -102,9 +121,6 @@
                                 <div class="empty-message">
                                     <i class="fas fa-inbox"></i>
                                     <p>No hay registros para mostrar</p>
-                                    <button class="btn btn-primary" onclick="mostrarModalCrear()">
-                                        <i class="fas fa-plus"></i> Crear primer activo
-                                    </button>
                                 </div>
                             </td>
                         </tr>
@@ -115,7 +131,132 @@
         </section>
     </main>
 
-    <!-- Modal Crear/Editar -->
+
+    <!-- ═══════════════════════════════════════════ -->
+    <!-- MODAL LOGIN (usuario o admin)               -->
+    <!-- ═══════════════════════════════════════════ -->
+    <div id="modalLogin" class="modal" style="display:none;">
+        <div class="modal-content" style="max-width:420px;">
+            <div class="modal-header" style="background:#39a900;">
+                <h2 style="color:white;">
+                    <i class="fas fa-sign-in-alt"></i> Iniciar Sesión
+                </h2>
+                <span class="close" onclick="cerrarModalLogin()" style="color:white;">
+                    <i class="fas fa-times"></i>
+                </span>
+            </div>
+            <form id="loginForm" style="padding:24px;">
+                <div class="form-group">
+                    <label><i class="fas fa-envelope"></i> Correo electrónico</label>
+                    <input type="email" id="loginEmail" required
+                        placeholder="tucorreo@gmail.com"
+                        style="width:100%;padding:10px;border:1px solid #ddd;
+                               border-radius:8px;margin-top:6px;font-size:14px;">
+                </div>
+                <div class="form-group" style="margin-top:16px;">
+                    <label><i class="fas fa-lock"></i> Contraseña</label>
+                    <input type="password" id="loginPassword" required
+                        placeholder="••••••••"
+                        style="width:100%;padding:10px;border:1px solid #ddd;
+                               border-radius:8px;margin-top:6px;font-size:14px;">
+                </div>
+
+                <!-- Mensaje de error -->
+                <p id="loginError" style="display:none;color:#e53935;font-size:13px;
+                    margin-top:10px;background:#ffebee;padding:8px 12px;
+                    border-radius:6px;"></p>
+
+                <div style="margin-top:24px;">
+                    <button type="submit" class="btn btn-primary"
+                        style="width:100%;justify-content:center;
+                               background:#39a900;border-color:#39a900;">
+                        <i class="fas fa-sign-in-alt"></i> Entrar
+                    </button>
+                </div>
+                <p style="color:#999;font-size:12px;text-align:center;margin-top:12px;">
+                    ¿Sin cuenta? Solicita una invitación al administrador
+                </p>
+            </form>
+        </div>
+    </div>
+
+
+    <!-- ═══════════════════════════════════════════ -->
+    <!-- MODAL REGISTRO (desde link de invitación)   -->
+    <!-- ═══════════════════════════════════════════ -->
+    <div id="modalRegistro" class="modal" style="display:none;">
+        <div class="modal-content" style="max-width:440px;">
+            <div class="modal-header" style="background:#39a900;">
+                <h2 style="color:white;">
+                    <i class="fas fa-user-plus"></i> Crear tu Cuenta
+                </h2>
+                <span class="close" onclick="cerrarModalRegistro()" style="color:white;">
+                    <i class="fas fa-times"></i>
+                </span>
+            </div>
+            <form id="registroForm" style="padding:24px;">
+                <!-- Email fijo (solo lectura) -->
+                <div class="form-group">
+                    <label><i class="fas fa-envelope"></i> Correo electrónico</label>
+                    <input type="email" id="registroEmail" readonly
+                        style="width:100%;padding:10px;border:1px solid #ddd;
+                               border-radius:8px;margin-top:6px;font-size:14px;
+                               background:#f5f5f5;color:#666;">
+                </div>
+
+                <!-- Nombre fijo (solo lectura) -->
+                <div class="form-group" style="margin-top:14px;">
+                    <label><i class="fas fa-user"></i> Nombre</label>
+                    <input type="text" id="registroNombre" readonly
+                        style="width:100%;padding:10px;border:1px solid #ddd;
+                               border-radius:8px;margin-top:6px;font-size:14px;
+                               background:#f5f5f5;color:#666;">
+                </div>
+
+                <!-- Token oculto -->
+                <input type="hidden" id="registroToken">
+
+                <!-- Contraseña nueva -->
+                <div class="form-group" style="margin-top:14px;">
+                    <label><i class="fas fa-lock"></i> Contraseña</label>
+                    <input type="password" id="registroPassword" required
+                        placeholder="Mínimo 6 caracteres"
+                        style="width:100%;padding:10px;border:1px solid #ddd;
+                               border-radius:8px;margin-top:6px;font-size:14px;">
+                </div>
+
+                <!-- Confirmar contraseña -->
+                <div class="form-group" style="margin-top:14px;">
+                    <label><i class="fas fa-lock"></i> Confirmar contraseña</label>
+                    <input type="password" id="registroConfirm" required
+                        placeholder="Repite tu contraseña"
+                        style="width:100%;padding:10px;border:1px solid #ddd;
+                               border-radius:8px;margin-top:6px;font-size:14px;">
+                </div>
+
+                <!-- Mensaje de error -->
+                <p id="registroError" style="display:none;color:#e53935;font-size:13px;
+                    margin-top:10px;background:#ffebee;padding:8px 12px;
+                    border-radius:6px;"></p>
+
+                <div style="margin-top:24px;">
+                    <button type="submit" class="btn btn-primary"
+                        style="width:100%;justify-content:center;
+                               background:#39a900;border-color:#39a900;">
+                        <i class="fas fa-user-check"></i> Crear Cuenta
+                    </button>
+                </div>
+                <p style="color:#999;font-size:12px;text-align:center;margin-top:12px;">
+                    Tu correo fue pre-asignado por el administrador
+                </p>
+            </form>
+        </div>
+    </div>
+
+
+    <!-- ═══════════════════════════════════════════ -->
+    <!-- MODAL CREAR/EDITAR ACTIVO                   -->
+    <!-- ═══════════════════════════════════════════ -->
     <div id="modal" class="modal">
         <div class="modal-content">
             <div class="modal-header">
@@ -132,7 +273,8 @@
                 </div>
                 <div class="form-group">
                     <label><i class="fas fa-align-left"></i> Descripción *</label>
-                    <textarea id="descripcion" rows="3" required placeholder="Descripción detallada del activo"></textarea>
+                    <textarea id="descripcion" rows="3" required
+                        placeholder="Descripción detallada del activo"></textarea>
                 </div>
                 <div class="form-grid">
                     <div class="form-group">
@@ -168,7 +310,6 @@
                             <i class="fas fa-camera"></i> Tomar foto con cámara
                         </button>
                     </div>
-                    <small class="form-hint">Puedes seleccionar múltiples imágenes (JPG, PNG) o tomar fotos con la cámara</small>
                 </div>
                 <div id="imagenesPreview" class="imagenes-preview"></div>
                 <div class="form-actions">
@@ -183,7 +324,10 @@
         </div>
     </div>
 
-    <!-- Modal Ver Detalles -->
+
+    <!-- ═══════════════════════════════════════════ -->
+    <!-- MODAL VER DETALLES                          -->
+    <!-- ═══════════════════════════════════════════ -->
     <div id="modalVer" class="modal">
         <div class="modal-content modal-large">
             <div class="modal-header">
@@ -196,7 +340,10 @@
         </div>
     </div>
 
-    <!-- Modal Historial -->
+
+    <!-- ═══════════════════════════════════════════ -->
+    <!-- MODAL HISTORIAL                             -->
+    <!-- ═══════════════════════════════════════════ -->
     <div id="modalHistorial" class="modal">
         <div class="modal-content modal-large">
             <div class="modal-header">
@@ -209,9 +356,12 @@
         </div>
     </div>
 
-    <!-- Modal Cámara -->
+
+    <!-- ═══════════════════════════════════════════ -->
+    <!-- MODAL CÁMARA                                -->
+    <!-- ═══════════════════════════════════════════ -->
     <div id="modalCamara" class="modal">
-        <div class="modal-content" style="max-width: 600px;">
+        <div class="modal-content" style="max-width:600px;">
             <div class="modal-header">
                 <h2><i class="fas fa-camera"></i> Tomar foto</h2>
                 <span class="close" onclick="cerrarCamara()">
@@ -219,9 +369,10 @@
                 </span>
             </div>
             <div class="detail-content">
-                <video id="videoCamara" autoplay playsinline style="width: 100%; border-radius: 8px; background: #000;"></video>
+                <video id="videoCamara" autoplay playsinline
+                    style="width:100%;border-radius:8px;background:#000;"></video>
                 <canvas id="canvasCamara" style="display:none;"></canvas>
-                <div class="form-actions" style="justify-content: center;">
+                <div class="form-actions" style="justify-content:center;">
                     <button type="button" class="btn btn-primary" onclick="capturarFoto()">
                         <i class="fas fa-camera"></i> Capturar
                     </button>
@@ -230,58 +381,24 @@
         </div>
     </div>
 
-    <!-- ✅ NUEVO: Modal Login Admin -->
-    <div id="modalAdminLogin" class="modal" style="display:none;">
-        <div class="modal-content" style="max-width: 420px;">
-            <div class="modal-header" style="background: #39a900;">
-                <h2 style="color: white;">
-                    <i class="fas fa-user-shield"></i> Admin Líder
-                </h2>
-                <span class="close" onclick="cerrarModalAdmin()" style="color: white;">
-                    <i class="fas fa-times"></i>
-                </span>
-            </div>
-            <form id="adminLoginForm" style="padding: 24px;">
-                <div class="form-group">
-                    <label><i class="fas fa-envelope"></i> Correo Admin</label>
-                    <input type="email" id="adminCorreo" required
-                        placeholder="lider@sena.edu.co"
-                        style="width:100%; padding:10px; border:1px solid #ddd; border-radius:8px; margin-top:6px;">
-                </div>
-                <div class="form-group" style="margin-top: 16px;">
-                    <label><i class="fas fa-lock"></i> Contraseña</label>
-                    <input type="password" id="adminClave" required
-                        placeholder="********"
-                        style="width:100%; padding:10px; border:1px solid #ddd; border-radius:8px; margin-top:6px;">
-                </div>
-                <div style="margin-top: 24px;">
-                    <button type="submit" class="btn btn-primary"
-                        style="width:100%; justify-content:center; background:#39a900; border-color:#39a900;">
-                        <i class="fas fa-sign-in-alt"></i> Entrar como Admin
-                    </button>
-                </div>
-                <p style="color:#999; font-size:12px; text-align:center; margin-top:12px;">
-                    Solo para el instructor líder del sistema
-                </p>
-            </form>
-        </div>
-    </div>
 
-    <!-- ✅ NUEVO: Modal Invitaciones -->
+    <!-- ═══════════════════════════════════════════ -->
+    <!-- MODAL PANEL ADMIN (invitaciones)            -->
+    <!-- ═══════════════════════════════════════════ -->
     <div id="modalInvitaciones" class="modal" style="display:none;">
         <div class="modal-content modal-large">
-            <div class="modal-header" style="background: #39a900;">
-                <h2 style="color: white;">
+            <div class="modal-header" style="background:#39a900;">
+                <h2 style="color:white;">
                     <i class="fas fa-paper-plane"></i> Panel Admin — Invitar Instructores
                 </h2>
-                <span class="close" onclick="cerrarModalInvitaciones()" style="color: white;">
+                <span class="close" onclick="cerrarModalInvitaciones()" style="color:white;">
                     <i class="fas fa-times"></i>
                 </span>
             </div>
             <div class="detail-content">
 
                 <!-- Formulario invitar -->
-                <div style="background:#f8f9fa; padding:20px; border-radius:8px; margin-bottom:24px;">
+                <div style="background:#f8f9fa;padding:20px;border-radius:8px;margin-bottom:24px;">
                     <h3 style="margin-bottom:16px;">
                         <i class="fas fa-user-plus"></i> Nueva Invitación
                     </h3>
@@ -290,37 +407,39 @@
                             <label><i class="fas fa-envelope"></i> Correo del instructor</label>
                             <input type="email" id="invEmail"
                                 placeholder="instructor@sena.edu.co"
-                                style="width:100%; padding:10px; border:1px solid #ddd; border-radius:8px; margin-top:6px;">
+                                style="width:100%;padding:10px;border:1px solid #ddd;
+                                       border-radius:8px;margin-top:6px;">
                         </div>
                         <div class="form-group">
                             <label><i class="fas fa-user"></i> Nombre completo</label>
                             <input type="text" id="invNombre"
                                 placeholder="Nombre del instructor"
-                                style="width:100%; padding:10px; border:1px solid #ddd; border-radius:8px; margin-top:6px;">
+                                style="width:100%;padding:10px;border:1px solid #ddd;
+                                       border-radius:8px;margin-top:6px;">
                         </div>
                     </div>
-                    <div style="margin-top:16px; display:flex; gap:12px; align-items:center;">
+                    <div style="margin-top:16px;">
                         <button class="btn btn-success" onclick="enviarInvitacionAdmin()">
                             <i class="fas fa-paper-plane"></i> Generar Invitación
                         </button>
                     </div>
 
-                    <!-- Caja donde aparece el link generado -->
-                    <div id="invLinkBox" style="display:none; margin-top:16px;
-                        background:#e8f5e9; border:1px solid #39a900;
-                        border-radius:8px; padding:16px;">
-                        <p style="margin:0 0 8px; font-weight:bold; color:#2e7d32;">
+                    <!-- Link generado -->
+                    <div id="invLinkBox" style="display:none;margin-top:16px;
+                        background:#e8f5e9;border:1px solid #39a900;
+                        border-radius:8px;padding:16px;">
+                        <p style="margin:0 0 8px;font-weight:bold;color:#2e7d32;">
                             ✅ Invitación generada — Copia y comparte este link:
                         </p>
-                        <div style="display:flex; gap:8px; align-items:center;">
+                        <div style="display:flex;gap:8px;align-items:center;">
                             <input type="text" id="invLinkTexto" readonly
-                                style="flex:1; padding:8px; border:1px solid #ccc;
-                                border-radius:6px; background:white; font-size:13px;">
+                                style="flex:1;padding:8px;border:1px solid #ccc;
+                                       border-radius:6px;background:white;font-size:13px;">
                             <button class="btn btn-primary" onclick="copiarLink()">
                                 <i class="fas fa-copy"></i> Copiar
                             </button>
                         </div>
-                        <small style="color:#666; margin-top:8px; display:block;">
+                        <small style="color:#666;margin-top:8px;display:block;">
                             Envía este link por WhatsApp o correo al instructor
                         </small>
                     </div>
@@ -340,6 +459,7 @@
         </div>
     </div>
 
-    <script src="/static/js/app.js?v=6"></script>
+
+    <script src="/static/js/app.js?v=7"></script>
 </body>
 </html>

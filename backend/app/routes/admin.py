@@ -23,7 +23,7 @@ class InvitacionIn(BaseModel):
 # ─── Utilidad: enviar email con SMTP (Mailersend) ────────────
 def enviar_email_smtp(to_email: str, nombre: str, invite_link: str):
     host     = os.getenv("EMAIL_HOST")
-    port     = int(os.getenv("EMAIL_PORT", "587"))
+    port     = int(os.getenv("EMAIL_PORT", "2525"))  # ← 2525 no bloqueado en cloud
     user     = os.getenv("EMAIL_USER")
     password = os.getenv("EMAIL_PASS")
     sender   = os.getenv("SENDER_EMAIL", user)
@@ -95,9 +95,12 @@ def enviar_email_smtp(to_email: str, nombre: str, invite_link: str):
     msg["To"]      = to_email
     msg.attach(MIMEText(html_body, "html"))
 
-    with smtplib.SMTP(host, port) as server:
+    # ✅ CORREGIDO — más robusto para entornos cloud como Render
+    with smtplib.SMTP(host, port, timeout=30) as server:
+        server.set_debuglevel(0)
         server.ehlo()
         server.starttls()
+        server.ehlo()
         server.login(user, password)
         server.sendmail(sender, [to_email], msg.as_string())
 

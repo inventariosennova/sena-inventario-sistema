@@ -237,7 +237,7 @@ async def exportar_excel(request: Request, db: Session = Depends(get_db)):
             "Placa":           a.placa,
             "Descripción":     a.descripcion,
             "Modelo":          a.modelo,
-            "Responsable":     a.responsable,
+            "Cuentadante":     a.responsable,
             "Cédula":          a.cedula_responsable,
             "Ubicación":       a.ubicacion,
             "Fecha Creación":  fecha_creacion,

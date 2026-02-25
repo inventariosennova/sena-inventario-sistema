@@ -5,7 +5,7 @@ from typing import List, Optional
 from app.database.database import get_db
 from app.models.activo import Activo
 from app.models.historial import HistorialCambio
-from app.routes.auth import requiere_auth, requiere_admin  # ← NUEVO
+from app.routes.auth import requiere_auth, requiere_admin
 import os
 from pathlib import Path
 import shutil
@@ -56,7 +56,7 @@ async def subir_imagen_cloudinary(imagen: UploadFile) -> str:
 @router.get("/activos")
 async def get_activos(
     placa: Optional[str] = None,
-    responsable: Optional[str] = None,
+    cuentadante: Optional[str] = None,
     cedula: Optional[str] = None,
     ubicacion: Optional[str] = None,
     skip: int = 0,
@@ -67,8 +67,8 @@ async def get_activos(
 
     if placa:
         query = query.filter(Activo.placa.contains(placa))
-    if responsable:
-        query = query.filter(Activo.responsable.contains(responsable))
+    if cuentadante:
+        query = query.filter(Activo.responsable.contains(cuentadante))
     if cedula:
         query = query.filter(Activo.cedula_responsable.contains(cedula))
     if ubicacion:
@@ -97,12 +97,12 @@ async def create_activo(
     placa: str = Form(...),
     descripcion: str = Form(...),
     modelo: str = Form(""),
-    responsable: str = Form(...),
+    cuentadante: str = Form(...),
     cedula_responsable: str = Form(""),
     ubicacion: str = Form(""),
     imagenes: List[UploadFile] = File([]),
     db: Session = Depends(get_db),
-    usuario = Depends(requiere_auth)  # ← PROTECCIÓN: debe estar logueado
+    usuario = Depends(requiere_auth)
 ):
     existing = db.query(Activo).filter(Activo.placa == placa).first()
     if existing:
@@ -118,7 +118,7 @@ async def create_activo(
         placa=placa,
         descripcion=descripcion,
         modelo=modelo,
-        responsable=responsable,
+        responsable=cuentadante,
         cedula_responsable=cedula_responsable,
         ubicacion=ubicacion,
         imagenes=imagen_urls
@@ -131,7 +131,7 @@ async def create_activo(
     historial = HistorialCambio(
         activo_id=nuevo_activo.id,
         placa=placa,
-        responsable=responsable,
+        responsable=cuentadante,
         accion="creado",
         descripcion_cambio=f"Creación del activo con placa {placa} por {usuario['nombre']}"
     )
@@ -148,13 +148,13 @@ async def update_activo(
     placa: Optional[str] = Form(None),
     descripcion: Optional[str] = Form(None),
     modelo: Optional[str] = Form(None),
-    responsable: Optional[str] = Form(None),
+    cuentadante: Optional[str] = Form(None),
     cedula_responsable: Optional[str] = Form(None),
     ubicacion: Optional[str] = Form(None),
     imagenes_existentes: Optional[str] = Form(None),
     imagenes: List[UploadFile] = File([]),
     db: Session = Depends(get_db),
-    usuario = Depends(requiere_auth)  # ← PROTECCIÓN: debe estar logueado
+    usuario = Depends(requiere_auth)
 ):
     activo = db.query(Activo).filter(Activo.id == activo_id).first()
     if not activo:
@@ -163,7 +163,7 @@ async def update_activo(
     if placa:               activo.placa = placa
     if descripcion:         activo.descripcion = descripcion
     if modelo:              activo.modelo = modelo
-    if responsable:         activo.responsable = responsable
+    if cuentadante:         activo.responsable = cuentadante
     if cedula_responsable:  activo.cedula_responsable = cedula_responsable
     if ubicacion:           activo.ubicacion = ubicacion
 
@@ -264,7 +264,7 @@ async def exportar_excel(request: Request, db: Session = Depends(get_db)):
 async def delete_activo(
     activo_id: int,
     db: Session = Depends(get_db),
-    usuario = Depends(requiere_admin)  # ← PROTECCIÓN: solo admin puede eliminar
+    usuario = Depends(requiere_admin)
 ):
     activo = db.query(Activo).filter(Activo.id == activo_id).first()
     if not activo:

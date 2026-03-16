@@ -6,6 +6,7 @@ import requests
 from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
 from sqlalchemy import text
+from app.routes.auth import requiere_admin
 
 from app.database.database import engine
 
@@ -165,13 +166,15 @@ def invitar_instructor(payload: InvitacionIn):
 
 # ─── Endpoint 2: Listar invitaciones ────────────────────────
 @router.get("/invitaciones")
-def listar_invitaciones():
+def listar_invitaciones(admin = Depends(requiere_admin)):
     try:
         with engine.begin() as conn:
             rows = conn.execute(text("""
-                SELECT email, nombre, usado, created_at, usado_at
-                FROM invitaciones
-                ORDER BY created_at DESC
+                SELECT i.email, i.nombre, i.usado, i.created_at, i.usado_at,
+                       u.activo AS usuario_activo
+                FROM invitaciones i
+                LEFT JOIN usuarios u ON i.email = u.email
+                ORDER BY i.created_at DESC
                 LIMIT 200
             """)).mappings().all()
         return [dict(r) for r in rows]
@@ -222,8 +225,8 @@ def validar_invitacion(token: str):
 
 # ─── Endpoint 4: Desactivar usuario por email ──────────────
 @router.post("/desactivar-usuario")
-def desactivar_usuario(payload: EmailIn, admin = Depends(lambda: None)):
-    # admin depende de implementacion auth; frontend debe enviar Authorization
+def desactivar_usuario(payload: EmailIn, admin = Depends(requiere_admin)):
+    # admin verificado por requiere_admin
     email = payload.email
     try:
         with engine.begin() as conn:
@@ -239,7 +242,7 @@ def desactivar_usuario(payload: EmailIn, admin = Depends(lambda: None)):
 
 # ─── Endpoint 5: Activar usuario por email ────────────────
 @router.post("/activar-usuario")
-def activar_usuario(payload: EmailIn, admin = Depends(lambda: None)):
+def activar_usuario(payload: EmailIn, admin = Depends(requiere_admin)):
     email = payload.email
     try:
         with engine.begin() as conn:
@@ -253,8 +256,8 @@ def activar_usuario(payload: EmailIn, admin = Depends(lambda: None)):
 
 
 # ─── Endpoint 6: Eliminar usuario por email ───────────────
-@router.delete("/eliminar-usuario")
-def eliminar_usuario(payload: EmailIn, admin = Depends(lambda: None)):
+@router.post("/eliminar-usuario")
+def eliminar_usuario(payload: EmailIn, admin = Depends(requiere_admin)):
     email = payload.email
     try:
         with engine.begin() as conn:
@@ -262,10 +265,9 @@ def eliminar_usuario(payload: EmailIn, admin = Depends(lambda: None)):
             result_user = conn.execute(text("""
                 DELETE FROM usuarios WHERE email = :email
             """), {"email": email})
-            # Opcional: marcar invitacion como usada para evitar reenvio accidental
+            # Marca invitacion como usada para evitar reenvio accidental y eliminar de la lista
             conn.execute(text("""
-                UPDATE invitaciones SET usado = true, usado_at = now()
-                WHERE email = :email
+                DELETE FROM invitaciones WHERE email = :email
             """), {"email": email})
         return {"ok": True, "mensaje": "Usuario eliminado.", "usuarios_afectados": result_user.rowcount}
     except Exception as e:
@@ -274,7 +276,7 @@ def eliminar_usuario(payload: EmailIn, admin = Depends(lambda: None)):
 
 # ─── Endpoint 7: Reenviar / regenerar invitación ──────────
 @router.post("/reenviar-invitacion")
-def reenviar_invitacion(payload: ReenviarIn, admin = Depends(lambda: None)):
+def reenviar_invitacion(payload: ReenviarIn, admin = Depends(requiere_admin)):
     frontend_url = os.getenv("FRONTEND_URL", "").rstrip("/")
     if not frontend_url:
         raise HTTPException(status_code=500, detail="Variable FRONTEND_URL no configurada.")

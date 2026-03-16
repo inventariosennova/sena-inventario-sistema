@@ -824,31 +824,39 @@ async function cargarInvitacionesAdmin() {
         if (!Array.isArray(data) || data.length === 0) {
             cont.innerHTML = '<p style="color:#999;">No hay invitaciones aún.</p>'; return;
         }
-        const filas = data.map(inv => `
-            <tr>
-                <td>${inv.nombre || ''}</td>
-                <td>${inv.email}</td>
-                <td>
-                    <span style="padding:4px 10px;border-radius:12px;font-size:12px;
-                        background:${inv.usado ? '#d4edda' : '#fff3cd'};
-                        color:${inv.usado ? '#155724' : '#856404'};">
-                        ${inv.usado ? '✅ Usado' : '⏳ Pendiente'}
-                    </span>
-                </td>
-                <td style="display:flex;align-items:center;gap:8px;">
-                    <span>${inv.created_at ? new Date(inv.created_at).toLocaleString('es-CO') : ''}</span>
-                    <button class="btn btn-danger" style="height:30px;padding:6px 8px;font-size:13px;"
-                        onclick="eliminarAccesoInvitado('${inv.email.replace(/'/g, "\\'")}')"
-                        title="Eliminar acceso">
-                        <i class="fas fa-user-slash"></i>
-                    </button>
-                </td>
-            </tr>`).join('');
+        const filas = data.map(inv => {
+            const estadoUsuario = inv.usuario_activo === true ? 'Activo' : inv.usuario_activo === false ? 'Inactivo' : 'No registrado';
+            const colorEstado = inv.usuario_activo === true ? '#d4edda' : inv.usuario_activo === false ? '#f8d7da' : '#fff3cd';
+            const textColor = inv.usuario_activo === true ? '#155724' : inv.usuario_activo === false ? '#721c24' : '#856404';
+            const acciones = [];
+            if (inv.usuario_activo === false) {
+                acciones.push(`<button class="btn btn-success" style="height:30px;padding:6px 8px;font-size:13px;" onclick="activarUsuario('${inv.email.replace(/'/g, "\\'")}')" title="Activar usuario"><i class="fas fa-user-check"></i></button>`);
+            }
+            if (inv.usuario_activo === true) {
+                acciones.push(`<button class="btn btn-warning" style="height:30px;padding:6px 8px;font-size:13px;" onclick="desactivarUsuario('${inv.email.replace(/'/g, "\\'")}')" title="Desactivar usuario"><i class="fas fa-user-times"></i></button>`);
+            }
+            acciones.push(`<button class="btn btn-danger" style="height:30px;padding:6px 8px;font-size:13px;" onclick="eliminarUsuario('${inv.email.replace(/'/g, "\\'")}')" title="Eliminar usuario"><i class="fas fa-user-slash"></i></button>`);
+            acciones.push(`<button class="btn btn-info" style="height:30px;padding:6px 8px;font-size:13px;" onclick="reenviarInvitacion('${inv.email.replace(/'/g, "\\'")}', '${(inv.nombre || '').replace(/'/g, "\\'")}')" title="Reenviar invitación"><i class="fas fa-envelope"></i></button>`);
+            return `
+                <tr>
+                    <td>${inv.nombre || ''}</td>
+                    <td>${inv.email}</td>
+                    <td>
+                        <span style="padding:4px 10px;border-radius:12px;font-size:12px;background:${colorEstado};color:${textColor};">
+                            ${estadoUsuario}
+                        </span>
+                    </td>
+                    <td>${inv.created_at ? new Date(inv.created_at).toLocaleString('es-CO') : ''}</td>
+                    <td style="display:flex;flex-wrap:wrap;gap:4px;align-items:center;">
+                        ${acciones.join('')}
+                    </td>
+                </tr>`;
+        }).join('');
         cont.innerHTML = `
             <div class="table-container" style="max-height:300px;overflow-y:auto;">
                 <table class="inventory-table">
                     <thead>
-                        <tr><th>Nombre</th><th>Correo</th><th>Estado</th><th>Fecha</th></tr>
+                        <tr><th>Nombre</th><th>Correo</th><th>Estado</th><th>Fecha</th><th>Acciones</th></tr>
                     </thead>
                     <tbody>${filas}</tbody>
                 </table>
@@ -856,21 +864,69 @@ async function cargarInvitacionesAdmin() {
     } catch (err) { cont.innerHTML = '<p style="color:#999;">Error cargando invitaciones.</p>'; }
 }
 
-// Revocar/eliminar acceso del usuario invitado (solo admin)
-async function eliminarAccesoInvitado(email) {
-    if (!esAdmin()) { mostrarError('Solo el admin puede revocar accesos'); return; }
-    if (!confirm(`¿Eliminar acceso para ${email}? Esta acción no se puede deshacer.`)) return;
+// Funciones para acciones de usuario
+async function desactivarUsuario(email) {
+    if (!esAdmin()) { mostrarError('Solo el admin puede desactivar usuarios'); return; }
+    if (!confirm(`¿Desactivar usuario ${email}? No podrá iniciar sesión.`)) return;
     try {
-        const res = await fetch(`${ADMIN_API}/revocar-usuario`, {
+        const res = await fetch(`${ADMIN_API}/desactivar-usuario`, {
             method: 'POST',
             headers: headersAuth(),
             body: JSON.stringify({ email })
         });
         const data = await res.json();
-        if (!res.ok) throw new Error(data.detail || 'Error revocando acceso');
-        mostrarExito('Acceso eliminado correctamente');
+        if (!res.ok) throw new Error(data.detail || 'Error desactivando usuario');
+        mostrarExito('Usuario desactivado correctamente');
         await cargarInvitacionesAdmin();
-    } catch (err) { mostrarError(err.message || 'Error revocando acceso'); }
+    } catch (err) { mostrarError(err.message || 'Error desactivando usuario'); }
+}
+
+async function activarUsuario(email) {
+    if (!esAdmin()) { mostrarError('Solo el admin puede activar usuarios'); return; }
+    if (!confirm(`¿Activar usuario ${email}? Podrá iniciar sesión.`)) return;
+    try {
+        const res = await fetch(`${ADMIN_API}/activar-usuario`, {
+            method: 'POST',
+            headers: headersAuth(),
+            body: JSON.stringify({ email })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail || 'Error activando usuario');
+        mostrarExito('Usuario activado correctamente');
+        await cargarInvitacionesAdmin();
+    } catch (err) { mostrarError(err.message || 'Error activando usuario'); }
+}
+
+async function eliminarUsuario(email) {
+    if (!esAdmin()) { mostrarError('Solo el admin puede eliminar usuarios'); return; }
+    if (!confirm(`¿Eliminar usuario ${email}? Esta acción no se puede deshacer.`)) return;
+    try {
+        const res = await fetch(`${ADMIN_API}/eliminar-usuario`, {
+            method: 'POST',
+            headers: headersAuth(),
+            body: JSON.stringify({ email })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail || 'Error eliminando usuario');
+        mostrarExito('Usuario eliminado correctamente');
+        await cargarInvitacionesAdmin();
+    } catch (err) { mostrarError(err.message || 'Error eliminando usuario'); }
+}
+
+async function reenviarInvitacion(email, nombre) {
+    if (!esAdmin()) { mostrarError('Solo el admin puede reenviar invitaciones'); return; }
+    if (!confirm(`¿Reenviar invitación a ${email}?`)) return;
+    try {
+        const res = await fetch(`${ADMIN_API}/reenviar-invitacion`, {
+            method: 'POST',
+            headers: headersAuth(),
+            body: JSON.stringify({ email, nombre })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail || 'Error reenviando invitación');
+        mostrarExito('Invitación reenviada correctamente');
+        await cargarInvitacionesAdmin();
+    } catch (err) { mostrarError(err.message || 'Error reenviando invitación'); }
 }
 
 

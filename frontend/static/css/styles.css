@@ -827,6 +827,9 @@ form {
     
     .header-content {
         padding: 0 1rem;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.75rem;
     }
     
     .header-text h1 {
@@ -835,6 +838,11 @@ form {
     
     .subtitle {
         font-size: 0.75rem;
+    }
+    
+    .header-actions {
+        width: 100%;
+        justify-content: flex-start;
     }
     
     .stats-section {
@@ -885,6 +893,11 @@ form {
     
     .table-container {
         font-size: 0.85rem;
+        overflow-x: auto;
+    }
+    
+    .inventory-table {
+        min-width: 600px;
     }
     
     .inventory-table th,
@@ -893,8 +906,14 @@ form {
     }
     
     .inventory-table .actions {
-        flex-direction: column;
+        display: flex;
         gap: 0.25rem;
+        flex-wrap: wrap;
+    }
+    
+    .btn {
+        padding: 0.625rem 0.875rem;
+        font-size: 0.875rem;
     }
     
     .modal-content {
@@ -905,6 +924,15 @@ form {
     .modal-header,
     form {
         padding: 1.5rem;
+    }
+    
+    /* Admin panel tabs responsivo */
+    [style*="display:flex"][style*="gap:12px"] {
+        flex-direction: column;
+    }
+    
+    [style*="display:flex"][style*="gap:12px"] .btn {
+        width: 100%;
     }
 }
 
@@ -917,9 +945,38 @@ form {
         height: 40px;
     }
     
+    .header-text h1 {
+        font-size: 1rem;
+    }
+    
     .btn {
-        padding: 0.625rem 1rem;
-        font-size: 0.875rem;
+        padding: 0.5rem 0.75rem;
+        font-size: 0.8rem;
+    }
+    
+    .inventory-table th,
+    .inventory-table td {
+        padding: 0.5rem 0.25rem;
+        font-size: 0.75rem;
+    }
+    
+    .inventory-table {
+        min-width: 500px;
+    }
+    
+    .modal-content {
+        width: 98%;
+    }
+    
+    .search-section,
+    .results-section {
+        padding: 1rem;
+    }
+    
+    /* Botones de tabla más pequeños en móvil */
+    .inventory-table .btn {
+        padding: 0.4rem 0.6rem;
+        font-size: 0.7rem;
     }
 }
 

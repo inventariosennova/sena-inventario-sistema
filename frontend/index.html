@@ -452,9 +452,6 @@
                         <button class="btn btn-secondary btn-admin-tab" onclick="cambiarTabAdmin('historial')" id="btnTabHistorial">
                             <i class="fas fa-clock-rotate-left"></i> Historial de Cambios
                         </button>
-                        <button class="btn btn-secondary btn-admin-tab" onclick="cambiarTabAdmin('sesiones')" id="btnTabSesiones">
-                            <i class="fas fa-user-clock"></i> Sesiones de Usuarios
-                        </button>
                         <button class="btn btn-secondary btn-admin-tab" onclick="cambiarTabAdmin('notificaciones')" id="btnTabNotificaciones">
                             <i class="fas fa-bell"></i> Notificaciones
                         </button>
@@ -483,21 +480,6 @@
                     </div>
                     <div id="listaHistorial" style="max-height:400px;overflow-y:auto;">
                         <p style="color:#999;">Cargando historial...</p>
-                    </div>
-                </div>
-
-                <!-- TAB: Sesiones de Usuarios -->
-                <div id="tabSesiones" style="display:none;">
-                    <h3 style="margin-bottom:16px;">
-                        <i class="fas fa-user-clock"></i> Registro de Sesiones de Usuarios
-                    </h3>
-                    <div style="margin-bottom:12px;">
-                        <button class="btn btn-warning" onclick="limpiarSesionesAntiguas(30)">
-                            <i class="fas fa-broom"></i> Limpiar Sesiones Antiguas (>30 días)
-                        </button>
-                    </div>
-                    <div id="listaSesiones" style="max-height:400px;overflow-y:auto;">
-                        <p style="color:#999;">Cargando sesiones...</p>
                     </div>
                 </div>
 

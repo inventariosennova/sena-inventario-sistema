@@ -214,3 +214,22 @@ def crear_notificacion(
         return {"ok": True, "mensaje": "Notificación creada"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error creando notificación: {str(e)}")
+
+
+# ─── Endpoint: Eliminar notificación (solo admin) ──────────────
+@router.delete("/notificaciones/{notif_id}")
+def eliminar_notificacion(notif_id: int, admin = Depends(requiere_admin)):
+    """Elimina una notificación del sistema"""
+    try:
+        with engine.begin() as conn:
+            result = conn.execute(text("""
+                DELETE FROM notificaciones
+                WHERE id = :id
+            """), {"id": notif_id})
+            if result.rowcount == 0:
+                raise HTTPException(status_code=404, detail="Notificación no encontrada")
+        return {"ok": True, "mensaje": "Notificación eliminada correctamente"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error eliminando notificación: {str(e)}")

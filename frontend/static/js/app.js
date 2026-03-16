@@ -1054,20 +1054,27 @@ async function reenviarInvitacion(email, nombre) {
 // =============================================
 function cambiarTabAdmin(tabName) {
     // Ocultar todos los tabs
-    const tabs = ['tabInvitaciones', 'tabHistorial', 'tabSesiones', 'tabNotificaciones'];
+    const tabs = ['tabInvitaciones', 'tabHistorial', 'tabNotificaciones'];
     tabs.forEach(tab => {
-        document.getElementById(tab).style.display = 'none';
-        document.getElementById(`btnTab${tab[3].toUpperCase() + tab.slice(4)}`).style.backgroundColor = '';
+        const tabEl = document.getElementById(tab);
+        if (tabEl) tabEl.style.display = 'none';
+        const btnId = `btnTab${tab.replace('tab', '')}`;
+        const btnEl = document.getElementById(btnId);
+        if (btnEl) btnEl.style.backgroundColor = '';
     });
     
     // Mostrar el tab seleccionado
-    document.getElementById(`tab${tabName.charAt(0).toUpperCase() + tabName.slice(1)}`).style.display = 'block';
-    document.getElementById(`btnTab${tabName.charAt(0).toUpperCase() + tabName.slice(1)}`).style.backgroundColor = '#39a900';
-    document.getElementById(`btnTab${tabName.charAt(0).toUpperCase() + tabName.slice(1)}`).style.color = 'white';
+    const capName = tabName.charAt(0).toUpperCase() + tabName.slice(1);
+    const tabEl = document.getElementById(`tab${capName}`);
+    const btnEl = document.getElementById(`btnTab${capName}`);
+    if (tabEl) tabEl.style.display = 'block';
+    if (btnEl) {
+        btnEl.style.backgroundColor = '#39a900';
+        btnEl.style.color = 'white';
+    }
     
     // Cargar datos según el tab
     if (tabName === 'historial') cargarHistorialCompleto();
-    if (tabName === 'sesiones') cargarSesionesUsuarios();
     if (tabName === 'notificaciones') cargarNotificacionesAdmin();
 }
 
@@ -1204,7 +1211,6 @@ async function cargarNotificacionesAdmin() {
         const filas = data.map(n => {
             const colorTipo = n.tipo === 'sesion' ? '#d4edda' : n.tipo === 'cambio' ? '#e7f1ff' : n.tipo === 'alerta' ? '#fff3cd' : '#f0f0f0';
             const textColor = n.tipo === 'sesion' ? '#155724' : n.tipo === 'cambio' ? '#0066cc' : n.tipo === 'alerta' ? '#856404' : '#333';
-            const estado = n.leida ? '✓ Leída' : '○ No leída';
             const btnClase = n.leida ? 'btn-leido' : 'btn-no-leido';
             const btnTexto = n.leida ? 'Leída' : 'Marcar leída';
             return `
@@ -1213,8 +1219,11 @@ async function cargarNotificacionesAdmin() {
                 <td><strong>${n.titulo}</strong></td>
                 <td>${n.mensaje.substring(0, 40)}...</td>
                 <td style="font-size:11px;color:#666;">${n.fecha_creacion ? new Date(n.fecha_creacion).toLocaleString('es-CO') : ''}</td>
-                <td style="text-align:center;">
+                <td style="text-align:center;display:flex;gap:4px;align-items:center;justify-content:center;flex-wrap:wrap;">
                     <button class="btn ${btnClase}" style="padding:4px 8px;font-size:11px;" onclick="marcarNotificacionLeida(${n.id})">${btnTexto}</button>
+                    <button class="btn btn-danger" style="padding:4px 8px;font-size:11px;" onclick="eliminarNotificacion(${n.id})" title="Eliminar">
+                        <i class="fas fa-trash"></i>
+                    </button>
                 </td>
             </tr>`;
         }).join('');
@@ -1227,13 +1236,32 @@ async function cargarNotificacionesAdmin() {
                             <th>Título</th>
                             <th>Mensaje</th>
                             <th>Fecha/Hora</th>
-                            <th>Estado</th>
+                            <th style="min-width:120px;">Acciones</th>
                         </tr>
                     </thead>
                     <tbody>${filas}</tbody>
                 </table>
             </div>`;
     } catch (err) { cont.innerHTML = '<p style="color:#999;">Error cargando notificaciones.</p>'; }
+}
+
+async function eliminarNotificacion(id) {
+    if (!confirm('¿Eliminar esta notificación?')) return;
+    try {
+        const res = await fetch(`${ADMIN_API}/notificaciones/${id}`, {
+            method: 'DELETE',
+            headers: headersAuth()
+        });
+        if (!res.ok) {
+            const err = await res.json();
+            throw new Error(err.detail || 'Error eliminando notificación');
+        }
+        mostrarExito('Notificación eliminada correctamente');
+        await cargarNotificacionesAdmin();
+        await actualizarBadgeNotificaciones();
+    } catch (err) {
+        mostrarError(err.message || 'Error eliminando notificación');
+    }
 }
 
 async function marcarNotificacionLeida(id) {

@@ -887,3 +887,35 @@ form {
     }
 }
 
+/* ===== FIX HEADER CUANDO USUARIO ESTA LOGUEADO ===== */
+
+.header-actions{
+    display:flex;
+    align-items:center;
+    gap:0.75rem;
+    flex-wrap:wrap;
+}
+
+#infoUsuario{
+    display:flex;
+    align-items:center;
+    gap:6px;
+    white-space:nowrap;
+}
+
+/* ===== RESPONSIVE HEADER CELULAR ===== */
+
+@media (max-width:768px){
+
+    .header-content{
+        flex-direction:column;
+        align-items:flex-start;
+        gap:10px;
+    }
+
+    .header-actions{
+        width:100%;
+        justify-content:flex-end;
+    }
+
+}

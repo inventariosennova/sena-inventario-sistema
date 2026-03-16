@@ -2,7 +2,8 @@ from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from app.routes import inventario
-from app.routes.admin import router as admin_router  # ← LÍNEA NUEVA
+from app.routes.admin import router as admin_router
+from app.routes.historial_sesiones import router as historial_router
 from app.database.database import init_db
 import os
 from pathlib import Path
@@ -35,7 +36,8 @@ app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
 
 # Incluir rutas API
 app.include_router(inventario.router)
-app.include_router(admin_router)  # ← LÍNEA NUEVA
+app.include_router(admin_router)
+app.include_router(historial_router)
 
 
 @app.on_event("startup")

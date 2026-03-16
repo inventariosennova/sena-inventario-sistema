@@ -122,6 +122,10 @@ document.addEventListener('DOMContentLoaded', () => {
             await hacerRegistro();
         });
     }
+
+    // Actualizar badge de notificaciones cada 30 segundos
+    setInterval(actualizarBadgeNotificaciones, 30000);
+    actualizarBadgeNotificaciones();
 });
 
 
@@ -771,6 +775,16 @@ function abrirModalAdmin() {
     if (!esAdmin()) { abrirModalLogin(); return; }
     abrirModalInvitaciones();
     cargarInvitacionesAdmin();
+    actualizarBadgeNotificaciones();
+    // Asegurar que el tab de invitaciones esté activo
+    document.getElementById('tabInvitaciones').style.display = 'block';
+    document.getElementById('tabHistorial').style.display = 'none';
+    document.getElementById('tabSesiones').style.display = 'none';
+    document.getElementById('tabNotificaciones').style.display = 'none';
+    if (document.getElementById('btnTabInvitaciones')) {
+        document.getElementById('btnTabInvitaciones').style.backgroundColor = '#39a900';
+        document.getElementById('btnTabInvitaciones').style.color = 'white';
+    }
 }
 
 
@@ -927,6 +941,231 @@ async function reenviarInvitacion(email, nombre) {
         mostrarExito('Invitación reenviada correctamente');
         await cargarInvitacionesAdmin();
     } catch (err) { mostrarError(err.message || 'Error reenviando invitación'); }
+}
+
+
+// =============================================
+// TAB NAVIGATION EN ADMIN
+// =============================================
+function cambiarTabAdmin(tabName) {
+    // Ocultar todos los tabs
+    const tabs = ['tabInvitaciones', 'tabHistorial', 'tabSesiones', 'tabNotificaciones'];
+    tabs.forEach(tab => {
+        document.getElementById(tab).style.display = 'none';
+        document.getElementById(`btnTab${tab[3].toUpperCase() + tab.slice(4)}`).style.backgroundColor = '';
+    });
+    
+    // Mostrar el tab seleccionado
+    document.getElementById(`tab${tabName.charAt(0).toUpperCase() + tabName.slice(1)}`).style.display = 'block';
+    document.getElementById(`btnTab${tabName.charAt(0).toUpperCase() + tabName.slice(1)}`).style.backgroundColor = '#39a900';
+    document.getElementById(`btnTab${tabName.charAt(0).toUpperCase() + tabName.slice(1)}`).style.color = 'white';
+    
+    // Cargar datos según el tab
+    if (tabName === 'historial') cargarHistorialCompleto();
+    if (tabName === 'sesiones') cargarSesionesUsuarios();
+    if (tabName === 'notificaciones') cargarNotificacionesAdmin();
+}
+
+
+// =============================================
+// HISTORIAL COMPLETO (solo admin)
+// =============================================
+async function cargarHistorialCompleto() {
+    const cont = document.getElementById('listaHistorial');
+    if (!cont) return;
+    try {
+        const res = await fetch(`${ADMIN_API}/historial-completo`, { headers: headersAuth() });
+        const data = await res.json();
+        if (!Array.isArray(data) || data.length === 0) {
+            cont.innerHTML = '<p style="color:#999;">No hay historial aún.</p>'; return;
+        }
+        const filas = data.map(h => `
+            <tr>
+                <td><strong>${h.placa || 'N/A'}</strong></td>
+                <td>${h.responsable}</td>
+                <td><span style="background:#e7f1ff;color:#0066cc;padding:4px 8px;border-radius:4px;font-size:12px;">${h.accion}</span></td>
+                <td>${h.descripcion_cambio.substring(0, 60)}...</td>
+                <td>${h.fecha_cambio ? new Date(h.fecha_cambio).toLocaleString('es-CO') : ''}</td>
+            </tr>`).join('');
+        cont.innerHTML = `
+            <div class="table-container">
+                <table class="inventory-table">
+                    <thead>
+                        <tr>
+                            <th>Placa</th>
+                            <th>Usuario</th>
+                            <th>Acción</th>
+                            <th>Descripción</th>
+                            <th>Fecha y Hora</th>
+                        </tr>
+                    </thead>
+                    <tbody>${filas}</tbody>
+                </table>
+            </div>`;
+    } catch (err) { cont.innerHTML = '<p style="color:#999;">Error cargando historial.</p>'; }
+}
+
+async function eliminarTodoHistorial() {
+    if (!confirm('⚠️ ¿Eliminar TODO el historial de cambios? Esta acción NO se puede deshacer.')) return;
+    if (!confirm('⚠️ Confirma nuevamente: Se eliminarán TODOS los registros del historial.')) return;
+    try {
+        const res = await fetch(`${ADMIN_API}/historial-limpiar`, {
+            method: 'DELETE',
+            headers: headersAuth()
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail || 'Error eliminando historial');
+        mostrarExito(`Historial eliminado: ${data.registros_eliminados} registros removidos`);
+        await cargarHistorialCompleto();
+    } catch (err) { mostrarError(err.message || 'Error eliminando historial'); }
+}
+
+
+// =============================================
+// SESIONES DE USUARIOS (solo admin)
+// =============================================
+async function cargarSesionesUsuarios() {
+    const cont = document.getElementById('listaSesiones');
+    if (!cont) return;
+    try {
+        const res = await fetch(`${ADMIN_API}/historial-sesiones`, { headers: headersAuth() });
+        const data = await res.json();
+        if (!Array.isArray(data) || data.length === 0) {
+            cont.innerHTML = '<p style="color:#999;">No hay sesiones registradas aún.</p>'; return;
+        }
+        const filas = data.map(s => {
+            const fechaIngreso = s.fecha_ingreso ? new Date(s.fecha_ingreso).toLocaleString('es-CO') : 'N/A';
+            const fechaSalida = s.fecha_salida ? new Date(s.fecha_salida).toLocaleString('es-CO') : 'Activa';
+            const duracion = s.duracion_horas ? s.duracion_horas.toFixed(2) : '0.00';
+            const estadoColor = s.fecha_salida ? '#f0f0f0' : '#e8f5e9';
+            return `
+            <tr style="background:${estadoColor};">
+                <td><strong>${s.nombre}</strong></td>
+                <td>${s.email}</td>
+                <td>${fechaIngreso}</td>
+                <td>${fechaSalida}</td>
+                <td>${duracion} h</td>
+                <td style="font-size:11px;color:#666;">${s.ip_address || 'N/A'}</td>
+            </tr>`}).join('');
+        cont.innerHTML = `
+            <div class="table-container">
+                <table class="inventory-table" style="font-size:13px;">
+                    <thead>
+                        <tr>
+                            <th>Usuario</th>
+                            <th>Correo</th>
+                            <th>Fecha/Hora Ingreso</th>
+                            <th>Fecha/Hora Salida</th>
+                            <th>Duración</th>
+                            <th>IP</th>
+                        </tr>
+                    </thead>
+                    <tbody>${filas}</tbody>
+                </table>
+            </div>`;
+    } catch (err) { cont.innerHTML = '<p style="color:#999;">Error cargando sesiones.</p>'; }
+}
+
+async function limpiarSesionesAntiguas(dias) {
+    if (!confirm(`¿Eliminar sesiones más antiguas que ${dias} días? Esta acción NO se puede deshacer.`)) return;
+    try {
+        const res = await fetch(`${ADMIN_API}/historial-sesiones-limpiar?dias=${dias}`, {
+            method: 'DELETE',
+            headers: headersAuth()
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail || 'Error limpiando sesiones');
+        mostrarExito(`Sesiones antiguas eliminadas: ${data.registros_eliminados} registros removidos`);
+        await cargarSesionesUsuarios();
+    } catch (err) { mostrarError(err.message || 'Error limpiando sesiones'); }
+}
+
+
+// =============================================
+// NOTIFICACIONES (solo admin)
+// =============================================
+async function cargarNotificacionesAdmin() {
+    const cont = document.getElementById('listaNotificaciones');
+    if (!cont) return;
+    try {
+        const res = await fetch(`${ADMIN_API}/notificaciones`, { headers: headersAuth() });
+        const data = await res.json();
+        if (!Array.isArray(data) || data.length === 0) {
+            cont.innerHTML = '<p style="color:#999;">No hay notificaciones.</p>'; return;
+        }
+        const filas = data.map(n => {
+            const colorTipo = n.tipo === 'sesion' ? '#d4edda' : n.tipo === 'cambio' ? '#e7f1ff' : n.tipo === 'alerta' ? '#fff3cd' : '#f0f0f0';
+            const textColor = n.tipo === 'sesion' ? '#155724' : n.tipo === 'cambio' ? '#0066cc' : n.tipo === 'alerta' ? '#856404' : '#333';
+            const estado = n.leida ? '✓ Leída' : '○ No leída';
+            return `
+            <tr>
+                <td><span style="background:${colorTipo};color:${textColor};padding:2px 8px;border-radius:3px;font-size:11px;">${n.tipo}</span></td>
+                <td><strong>${n.titulo}</strong></td>
+                <td>${n.mensaje.substring(0, 40)}...</td>
+                <td style="font-size:11px;color:#666;">${n.fecha_creacion ? new Date(n.fecha_creacion).toLocaleString('es-CO') : ''}</td>
+                <td style="text-align:center;">${estado}</td>
+            </tr>`}).join('');
+        cont.innerHTML = `
+            <div class="table-container">
+                <table class="inventory-table" style="font-size:12px;">
+                    <thead>
+                        <tr>
+                            <th>Tipo</th>
+                            <th>Título</th>
+                            <th>Mensaje</th>
+                            <th>Fecha/Hora</th>
+                            <th>Estado</th>
+                        </tr>
+                    </thead>
+                    <tbody>${filas}</tbody>
+                </table>
+            </div>`;
+    } catch (err) { cont.innerHTML = '<p style="color:#999;">Error cargando notificaciones.</p>'; }
+}
+
+
+// =============================================
+// PANEL NOTIFICACIONES (header popup)
+// =============================================
+async function abrirPanelNotificaciones() {
+    if (!estaLogueado()) { abrirModalLogin(); return; }
+    const panel = document.getElementById('panelNotificaciones');
+    panel.style.display = 'flex';
+    const cont = document.getElementById('listaNotificacionesPanel');
+    try {
+        const res = await fetch(`${ADMIN_API}/notificaciones`, { headers: headersAuth() });
+        const data = await res.json();
+        if (!Array.isArray(data) || data.length === 0) {
+            cont.innerHTML = '<p style="color:#999;text-align:center;">No hay notificaciones.</p>'; return;
+        }
+        const listaNotif = data.slice(0, 10).map(n => `
+            <div style="padding:10px;border-bottom:1px solid #eee;cursor:pointer;hover:background:#f5f5f5;">
+                <div style="font-weight:bold;font-size:13px;color:#333;">${n.titulo}</div>
+                <small style="color:#666;">${n.mensaje.substring(0, 50)}...</small>
+                <div style="font-size:11px;color:#999;margin-top:4px;">${n.fecha_creacion ? new Date(n.fecha_creacion).toLocaleString('es-CO') : ''}</div>
+            </div>`).join('');
+        cont.innerHTML = listaNotif;
+    } catch (err) { cont.innerHTML = '<p style="color:#999;">Error cargando.</p>'; }
+}
+
+function cerrarPanelNotificaciones() {
+    document.getElementById('panelNotificaciones').style.display = 'none';
+}
+
+async function actualizarBadgeNotificaciones() {
+    if (!esAdmin()) return;
+    try {
+        const res = await fetch(`${ADMIN_API}/notificaciones`, { headers: headersAuth() });
+        const data = await res.json();
+        const noLeidas = Array.isArray(data) ? data.filter(n => !n.leida).length : 0;
+        const badge = document.getElementById('notificacionesBadge');
+        if (noLeidas > 0) {
+            badge.textContent = noLeidas > 9 ? '9+' : noLeidas;
+            badge.style.display = 'flex';
+        } else {
+            badge.style.display = 'none';
+        }
+    } catch (err) { console.log('Error actualizando badge'); }
 }
 
 

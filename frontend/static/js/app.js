@@ -725,7 +725,9 @@ async function abrirCamara() {
         if (!navigator.mediaDevices?.getUserMedia) {
             alert('La cámara no es compatible en este navegador'); return;
         }
-        streamCamara = await navigator.mediaDevices.getUserMedia({ video: true });
+        streamCamara = await navigator.mediaDevices.getUserMedia({
+            video: { facingMode: { ideal: "environment" } }
+});
         document.getElementById('videoCamara').srcObject = streamCamara;
         document.getElementById('modalCamara').style.display = 'block';
     } catch (error) { mostrarError('No se pudo acceder a la cámara'); }

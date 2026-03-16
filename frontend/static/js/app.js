@@ -835,7 +835,14 @@ async function cargarInvitacionesAdmin() {
                         ${inv.usado ? '✅ Usado' : '⏳ Pendiente'}
                     </span>
                 </td>
-                <td>${inv.created_at ? new Date(inv.created_at).toLocaleString('es-CO') : ''}</td>
+                <td style="display:flex;align-items:center;gap:8px;">
+                    <span>${inv.created_at ? new Date(inv.created_at).toLocaleString('es-CO') : ''}</span>
+                    <button class="btn btn-danger" style="height:30px;padding:6px 8px;font-size:13px;"
+                        onclick="eliminarAccesoInvitado('${inv.email.replace(/'/g, "\\'")}')"
+                        title="Eliminar acceso">
+                        <i class="fas fa-user-slash"></i>
+                    </button>
+                </td>
             </tr>`).join('');
         cont.innerHTML = `
             <div class="table-container" style="max-height:300px;overflow-y:auto;">
@@ -847,6 +854,23 @@ async function cargarInvitacionesAdmin() {
                 </table>
             </div>`;
     } catch (err) { cont.innerHTML = '<p style="color:#999;">Error cargando invitaciones.</p>'; }
+}
+
+// Revocar/eliminar acceso del usuario invitado (solo admin)
+async function eliminarAccesoInvitado(email) {
+    if (!esAdmin()) { mostrarError('Solo el admin puede revocar accesos'); return; }
+    if (!confirm(`¿Eliminar acceso para ${email}? Esta acción no se puede deshacer.`)) return;
+    try {
+        const res = await fetch(`${ADMIN_API}/revocar-usuario`, {
+            method: 'POST',
+            headers: headersAuth(),
+            body: JSON.stringify({ email })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail || 'Error revocando acceso');
+        mostrarExito('Acceso eliminado correctamente');
+        await cargarInvitacionesAdmin();
+    } catch (err) { mostrarError(err.message || 'Error revocando acceso'); }
 }
 
 

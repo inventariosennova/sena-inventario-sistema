@@ -213,7 +213,37 @@ def validar_invitacion(token: str):
 
 
 
-# ─── Endpoint 4: Marcar como usada ──────────────────────────
+# ─── Endpoint 4: Revocar/Desactivar usuario por email ──────
+@router.post("/revocar-usuario")
+def revocar_usuario(payload: dict):
+    """Recibe JSON { "email": "user@example.com" } y desactiva el usuario
+    correspondiente (usuarios.activo = false). Si existe una invitación
+    pendiente también la marca como usada (usado = true).
+    """
+    email = payload.get('email') if isinstance(payload, dict) else None
+    if not email:
+        raise HTTPException(status_code=400, detail="Se requiere el campo 'email'.")
+    try:
+        with engine.begin() as conn:
+            # Desactivar usuario si existe
+            result_user = conn.execute(text("""
+                UPDATE usuarios SET activo = false
+                WHERE email = :email AND activo = true
+            """), {"email": email})
+
+            # Marcar invitación como usada (para evitar reuso)
+            conn.execute(text("""
+                UPDATE invitaciones SET usado = true, usado_at = now()
+                WHERE email = :email
+            """), {"email": email})
+
+        return {"ok": True, "mensaje": "Acceso revocado para el usuario (si existía).", "usuarios_afectados": result_user.rowcount}
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error revocando usuario: {str(e)}")
+
+
+# ─── Endpoint 5: Marcar como usada ──────────────────────────
 @router.post("/marcar-usada")
 def marcar_usada(token: str):
     try:

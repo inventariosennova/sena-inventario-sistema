@@ -47,7 +47,9 @@ function guardarSesion(data) {
 }
 
 
-function cerrarSesion() {
+async function cerrarSesion() {
+    await registrarSesionCierre();
+
     localStorage.removeItem('token');
     localStorage.removeItem('usuario');
     actualizarNavbar();
@@ -61,6 +63,33 @@ function headersAuth() {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${getToken()}`
     };
+}
+
+async function registrarSesionInicio() {
+    if (!getToken()) return;
+    try {
+        await fetch(`${ADMIN_API}/sesion/inicio`, {
+            method: 'POST',
+            headers: headersAuth(),
+            body: JSON.stringify({
+                user_agent: navigator.userAgent
+            })
+        });
+    } catch (err) {
+        console.warn('No se pudo registrar sesión:', err);
+    }
+}
+
+async function registrarSesionCierre() {
+    if (!getToken()) return;
+    try {
+        await fetch(`${ADMIN_API}/sesion/cierre`, {
+            method: 'POST',
+            headers: headersAuth()
+        });
+    } catch (err) {
+        console.warn('No se pudo cerrar sesión:', err);
+    }
 }
 
 
@@ -162,6 +191,13 @@ async function hacerLogin(email, password) {
         actualizarNavbar();
         renderizarTabla(activos);
         mostrarExito(`¡Bienvenido(a) ${data.nombre}!`);
+
+        // Registrar sesión en el backend para que aparezca en el panel de sesiones
+        await registrarSesionInicio();
+
+        // Recargar filtros en caso de que el usuario cambie el comportamiento del acceso
+        await cargarCuentadantes();
+        await cargarUbicaciones();
 
         if (data.rol === 'admin') {
             abrirModalInvitaciones();
@@ -454,6 +490,7 @@ document.getElementById('activoForm').addEventListener('submit', async (e) => {
         mostrarExito(activoId ? 'Activo actualizado exitosamente' : 'Activo creado exitosamente');
         cerrarModal();
         cargarActivos();
+        if (esAdmin()) await actualizarBadgeNotificaciones();
     } catch (error) {
         mostrarError(error.message || 'Error al guardar el activo');
     }
@@ -477,6 +514,7 @@ async function eliminarActivo(id) {
         }
         mostrarExito('Activo eliminado exitosamente');
         cargarActivos();
+        if (esAdmin()) await actualizarBadgeNotificaciones();
     } catch (err) {
         mostrarError(err.message);
     }
@@ -526,6 +564,15 @@ function normalizeStringValue(val) {
     return val.toString().trim().replace(/\s+/g, ' ');
 }
 
+function normalizeForFilter(val) {
+    if (!val) return '';
+    return val.toString()
+        .trim()
+        .toLowerCase()
+        .replace(/\s+/g, '')
+        .replace(/[^a-z0-9áéíóúüñ]/gi, '');
+}
+
 
 // =============================================
 // CUENTADANTES Y UBICACIONES
@@ -534,19 +581,25 @@ async function cargarCuentadantes() {
     try {
         const response = await fetch(`${API_URL}/activos?limit=1000`);
         const data     = await response.json();
-            const map = new Map();
+        const map = new Map();
         data.activos.forEach(a => {
             if (!a.responsable) return;
-            const norm = normalizeStringValue(a.responsable);
-            if (!map.has(norm)) map.set(norm, a.responsable);
+            const norm = normalizeForFilter(a.responsable);
+            if (!map.has(norm)) map.set(norm, normalizeStringValue(a.responsable));
         });
-        const select   = document.getElementById('searchResponsable');
-        map.forEach((orig) => {
+        const select = document.getElementById('searchResponsable');
+        if (!select) return;
+        // Limpiar opciones previas (evita duplicados cuando se llama más de una vez)
+        select.innerHTML = '<option value="">Todos los Cuentadante</option>';
+        map.forEach((display, norm) => {
             const option = document.createElement('option');
-            option.value = orig; option.textContent = orig;
+            option.value = norm;
+            option.textContent = display;
             select.appendChild(option);
         });
-    } catch (error) { console.error('Error cargando cuentadantes:', error); }
+    } catch (error) {
+        console.error('Error cargando cuentadantes:', error);
+    }
 }
 
 
@@ -557,16 +610,22 @@ async function cargarUbicaciones() {
         const map = new Map();
         data.activos.forEach(a => {
             if (!a.ubicacion) return;
-            const norm = normalizeStringValue(a.ubicacion);
-            if (!map.has(norm)) map.set(norm, a.ubicacion);
+            const norm = normalizeForFilter(a.ubicacion);
+            if (!map.has(norm)) map.set(norm, normalizeStringValue(a.ubicacion));
         });
-        const select   = document.getElementById('searchUbicacion');
-        map.forEach((orig) => {
+        const select = document.getElementById('searchUbicacion');
+        if (!select) return;
+        // Limpiar opciones previas (evita duplicados cuando se llama más de una vez)
+        select.innerHTML = '<option value="">Todas las ubicaciones</option>';
+        map.forEach((display, norm) => {
             const option = document.createElement('option');
-            option.value = orig; option.textContent = orig;
+            option.value = norm;
+            option.textContent = display;
             select.appendChild(option);
         });
-    } catch (error) { console.error('Error cargando ubicaciones:', error); }
+    } catch (error) {
+        console.error('Error cargando ubicaciones:', error);
+    }
 }
 
 
@@ -602,15 +661,28 @@ function limpiarFiltros() {
 // =============================================
 async function exportarExcel() {
     try {
-        const response = await fetch(`${API_URL}/exportar/excel`);
+        const params = new URLSearchParams();
+        const placa       = document.getElementById('searchPlaca').value;
+        const cedula      = document.getElementById('searchCedula').value;
+        const cuentadante = document.getElementById('searchResponsable').value;
+        const ubicacion   = document.getElementById('searchUbicacion').value;
+        if (placa) params.append('placa', placa);
+        if (cedula) params.append('cedula', cedula);
+        if (cuentadante) params.append('cuentadante', cuentadante);
+        if (ubicacion) params.append('ubicacion', ubicacion);
+
+        const url = `${API_URL}/exportar/excel?${params.toString()}`;
+        const response = await fetch(url);
         if (!response.ok) throw new Error('No se pudo generar el archivo');
         const blob = await response.blob();
-        const url  = window.URL.createObjectURL(blob);
+        const downloadUrl  = window.URL.createObjectURL(blob);
         const a    = document.createElement('a');
-        a.href = url; a.download = 'activos_sena.xlsx';
+        a.href = downloadUrl; a.download = 'activos_sena.xlsx';
         document.body.appendChild(a); a.click(); a.remove();
-        window.URL.revokeObjectURL(url);
-    } catch (error) { mostrarError('Error al exportar a Excel'); }
+        window.URL.revokeObjectURL(downloadUrl);
+    } catch (error) {
+        mostrarError('Error al exportar a Excel');
+    }
 }
 
 

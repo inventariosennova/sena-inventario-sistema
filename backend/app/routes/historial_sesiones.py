@@ -11,16 +11,13 @@ router = APIRouter(prefix="/api/admin", tags=["Historial y Sesiones"])
 
 # ─── Modelos Pydantic ─────────────────────────────────────────
 class RegistrarSesionIn(BaseModel):
-    usuario_id: int
-    email: str
-    nombre: str
     ip_address: str | None = None
     user_agent: str | None = None
 
 
 # ─── Endpoint: Registrar sesión (en login) ────────────────────
 @router.post("/sesion/inicio")
-def registrar_sesion_inicio(payload: RegistrarSesionIn):
+def registrar_sesion_inicio(payload: RegistrarSesionIn, usuario = Depends(requiere_auth)):
     """Registra el inicio de sesión de un usuario"""
     try:
         with engine.begin() as conn:
@@ -29,9 +26,9 @@ def registrar_sesion_inicio(payload: RegistrarSesionIn):
                 VALUES (:usuario_id, :email, :nombre, now(), :ip_address, :user_agent)
                 RETURNING id
             """), {
-                "usuario_id": payload.usuario_id,
-                "email": payload.email,
-                "nombre": payload.nombre,
+                "usuario_id": usuario.get('id'),
+                "email": usuario.get('email'),
+                "nombre": usuario.get('nombre'),
                 "ip_address": payload.ip_address,
                 "user_agent": payload.user_agent
             })
@@ -43,9 +40,10 @@ def registrar_sesion_inicio(payload: RegistrarSesionIn):
 
 # ─── Endpoint: Registrar salida de sesión ─────────────────────
 @router.post("/sesion/cierre")
-def registrar_sesion_cierre(email: str, admin = Depends(requiere_admin)):
+def registrar_sesion_cierre(usuario = Depends(requiere_auth)):
     """Registra la salida de sesión de un usuario"""
     try:
+        email = usuario.get('email')
         with engine.begin() as conn:
             conn.execute(text("""
                 UPDATE sesiones_usuarios
@@ -137,7 +135,7 @@ def limpiar_sesiones_antiguas(admin = Depends(requiere_admin), dias: int = 30):
         with engine.begin() as conn:
             result = conn.execute(text("""
                 DELETE FROM sesiones_usuarios
-                WHERE fecha_ingreso < now() - INTERVAL ':dias days'
+                WHERE fecha_ingreso < now() - (:dias * INTERVAL '1 day')
             """), {"dias": dias})
         return {
             "ok": True,

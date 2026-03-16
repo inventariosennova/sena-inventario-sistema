@@ -327,6 +327,17 @@ body {
     font-size: 0.875rem;
 }
 
+.btn-admin-tab {
+    background: var(--sena-green);
+    color: var(--white);
+    border: 1px solid rgba(0,0,0,0.08);
+    transition: var(--transition);
+}
+
+.btn-admin-tab:hover {
+    background: var(--sena-green-dark);
+}
+
 .btn-delete {
     background: #f44336;
     color: var(--white);

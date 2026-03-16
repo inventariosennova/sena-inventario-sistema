@@ -1,10 +1,12 @@
 # backend/app/routes/inventario.py
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, Request
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 from typing import List, Optional
 from app.database.database import get_db
 from app.models.activo import Activo
 from app.models.historial import HistorialCambio
+from app.models.notificacion import Notificacion
 from app.routes.auth import requiere_auth, requiere_admin
 import os
 from pathlib import Path
@@ -66,13 +68,19 @@ async def get_activos(
     query = db.query(Activo)
 
     if placa:
-        query = query.filter(Activo.placa.contains(placa))
+        query = query.filter(Activo.placa.ilike(f"%{placa}%"))
     if cuentadante:
-        query = query.filter(Activo.responsable.contains(cuentadante))
+        norm = cuentadante.strip().lower().replace(' ', '')
+        query = query.filter(
+            func.replace(func.lower(Activo.responsable), ' ', '').like(f"%{norm}%")
+        )
     if cedula:
         query = query.filter(Activo.cedula_responsable.contains(cedula))
     if ubicacion:
-        query = query.filter(Activo.ubicacion.contains(ubicacion))
+        norm = ubicacion.strip().lower().replace(' ', '')
+        query = query.filter(
+            func.replace(func.lower(Activo.ubicacion), ' ', '').like(f"%{norm}%")
+        )
 
     activos = query.offset(skip).limit(limit).all()
 
@@ -142,6 +150,16 @@ async def create_activo(
         descripcion_cambio=f"Creación del activo con placa {placa} por {usuario.get('nombre')}"
     )
     db.add(historial)
+
+    # Crear notificación para el administrador
+    notificacion = Notificacion(
+        tipo="cambio",
+        titulo="Nuevo activo creado",
+        mensaje=f"Activo {placa} creado por {usuario.get('nombre')}",
+        usuario_email=usuario.get('email')
+    )
+    db.add(notificacion)
+
     db.commit()
 
     return nuevo_activo
@@ -207,6 +225,16 @@ async def update_activo(
         descripcion_cambio=f"Actualización por {usuario.get('nombre')}"
     )
     db.add(historial)
+
+    # Crear notificación para el administrador
+    notificacion = Notificacion(
+        tipo="cambio",
+        titulo="Activo actualizado",
+        mensaje=f"Activo {activo.placa} actualizado por {usuario.get('nombre')}",
+        usuario_email=usuario.get('email')
+    )
+    db.add(notificacion)
+
     db.commit()
 
     return activo
@@ -238,8 +266,32 @@ async def get_historial_general(db: Session = Depends(get_db)):
 
 # ─── GET exportar Excel — SIN protección (espectadores pueden descargar) ───────
 @router.get("/exportar/excel")
-async def exportar_excel(request: Request, db: Session = Depends(get_db)):
-    activos = db.query(Activo).all()
+async def exportar_excel(
+    request: Request,
+    placa: Optional[str] = None,
+    cuentadante: Optional[str] = None,
+    cedula: Optional[str] = None,
+    ubicacion: Optional[str] = None,
+    db: Session = Depends(get_db)
+):
+    # Aplicar los mismos filtros que la lista de activos
+    query = db.query(Activo)
+    if placa:
+        query = query.filter(Activo.placa.ilike(f"%{placa}%"))
+    if cuentadante:
+        norm = cuentadante.strip().lower().replace(' ', '')
+        query = query.filter(
+            func.replace(func.lower(Activo.responsable), ' ', '').like(f"%{norm}%")
+        )
+    if cedula:
+        query = query.filter(Activo.cedula_responsable.contains(cedula))
+    if ubicacion:
+        norm = ubicacion.strip().lower().replace(' ', '')
+        query = query.filter(
+            func.replace(func.lower(Activo.ubicacion), ' ', '').like(f"%{norm}%")
+        )
+
+    activos = query.all()
     data = []
     for a in activos:
         fecha_creacion = a.created_at.strftime("%Y-%m-%d %H:%M:%S") if a.created_at else ""
@@ -291,6 +343,16 @@ async def delete_activo(
         descripcion_cambio=f"Eliminación por admin: {usuario.get('nombre')}"
     )
     db.add(historial)
+
+    # Crear notificación para el administrador
+    notificacion = Notificacion(
+        tipo="cambio",
+        titulo="Activo eliminado",
+        mensaje=f"Activo {activo.placa} eliminado por {usuario.get('nombre')}",
+        usuario_email=usuario.get('email')
+    )
+    db.add(notificacion)
+
     db.delete(activo)
     db.commit()
 

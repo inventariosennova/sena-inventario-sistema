@@ -3,7 +3,7 @@ import os
 import uuid
 import requests
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
 from sqlalchemy import text
 
@@ -16,6 +16,13 @@ router = APIRouter(prefix="/api/admin", tags=["Admin"])
 class InvitacionIn(BaseModel):
     email: str
     nombre: str
+
+class EmailIn(BaseModel):
+    email: str
+
+class ReenviarIn(BaseModel):
+    email: str
+    nombre: str | None = None
 
 
 # ─── Utilidad: enviar email con Brevo API ───────────────────
@@ -213,34 +220,86 @@ def validar_invitacion(token: str):
 
 
 
-# ─── Endpoint 4: Revocar/Desactivar usuario por email ──────
-@router.post("/revocar-usuario")
-def revocar_usuario(payload: dict):
-    """Recibe JSON { "email": "user@example.com" } y desactiva el usuario
-    correspondiente (usuarios.activo = false). Si existe una invitación
-    pendiente también la marca como usada (usado = true).
-    """
-    email = payload.get('email') if isinstance(payload, dict) else None
-    if not email:
-        raise HTTPException(status_code=400, detail="Se requiere el campo 'email'.")
+# ─── Endpoint 4: Desactivar usuario por email ──────────────
+@router.post("/desactivar-usuario")
+def desactivar_usuario(payload: EmailIn, admin = Depends(lambda: None)):
+    # admin depende de implementacion auth; frontend debe enviar Authorization
+    email = payload.email
     try:
         with engine.begin() as conn:
-            # Desactivar usuario si existe
             result_user = conn.execute(text("""
                 UPDATE usuarios SET activo = false
                 WHERE email = :email AND activo = true
             """), {"email": email})
 
-            # Marcar invitación como usada (para evitar reuso)
+        return {"ok": True, "mensaje": "Usuario desactivado.", "usuarios_afectados": result_user.rowcount}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error desactivando usuario: {str(e)}")
+
+
+# ─── Endpoint 5: Activar usuario por email ────────────────
+@router.post("/activar-usuario")
+def activar_usuario(payload: EmailIn, admin = Depends(lambda: None)):
+    email = payload.email
+    try:
+        with engine.begin() as conn:
+            result_user = conn.execute(text("""
+                UPDATE usuarios SET activo = true
+                WHERE email = :email AND (activo = false OR activo IS NULL)
+            """), {"email": email})
+        return {"ok": True, "mensaje": "Usuario activado.", "usuarios_afectados": result_user.rowcount}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error activando usuario: {str(e)}")
+
+
+# ─── Endpoint 6: Eliminar usuario por email ───────────────
+@router.delete("/eliminar-usuario")
+def eliminar_usuario(payload: EmailIn, admin = Depends(lambda: None)):
+    email = payload.email
+    try:
+        with engine.begin() as conn:
+            # Borrar el usuario
+            result_user = conn.execute(text("""
+                DELETE FROM usuarios WHERE email = :email
+            """), {"email": email})
+            # Opcional: marcar invitacion como usada para evitar reenvio accidental
             conn.execute(text("""
                 UPDATE invitaciones SET usado = true, usado_at = now()
                 WHERE email = :email
             """), {"email": email})
-
-        return {"ok": True, "mensaje": "Acceso revocado para el usuario (si existía).", "usuarios_afectados": result_user.rowcount}
-
+        return {"ok": True, "mensaje": "Usuario eliminado.", "usuarios_afectados": result_user.rowcount}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error revocando usuario: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error eliminando usuario: {str(e)}")
+
+
+# ─── Endpoint 7: Reenviar / regenerar invitación ──────────
+@router.post("/reenviar-invitacion")
+def reenviar_invitacion(payload: ReenviarIn, admin = Depends(lambda: None)):
+    frontend_url = os.getenv("FRONTEND_URL", "").rstrip("/")
+    if not frontend_url:
+        raise HTTPException(status_code=500, detail="Variable FRONTEND_URL no configurada.")
+    email = payload.email
+    nombre = payload.nombre or email.split('@')[0]
+    token = str(uuid.uuid4())
+    invite_link = f"{frontend_url}/?invite={token}"
+    try:
+        with engine.begin() as conn:
+            conn.execute(text("""
+                INSERT INTO invitaciones (email, nombre, token, usado, created_at, usado_at)
+                VALUES (:email, :nombre, :token, false, now(), null)
+                ON CONFLICT (email)
+                DO UPDATE SET
+                    nombre = EXCLUDED.nombre,
+                    token  = EXCLUDED.token,
+                    usado  = false,
+                    created_at = now(),
+                    usado_at = null
+            """), {"email": email, "nombre": nombre, "token": token})
+        # enviar email
+        enviar_email_brevo(email, nombre, invite_link)
+        return {"ok": True, "mensaje": "Invitación reenviada.", "link": invite_link}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error reenviando invitacion: {str(e)}")
 
 
 # ─── Endpoint 5: Marcar como usada ──────────────────────────

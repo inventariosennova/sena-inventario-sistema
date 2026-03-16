@@ -68,27 +68,41 @@ function headersAuth() {
 async function registrarSesionInicio() {
     if (!getToken()) return;
     try {
-        await fetch(`${ADMIN_API}/sesion/inicio`, {
+        const res = await fetch(`${ADMIN_API}/sesion/inicio`, {
             method: 'POST',
             headers: headersAuth(),
             body: JSON.stringify({
                 user_agent: navigator.userAgent
             })
         });
+        if (!res.ok) {
+            const err = await res.json();
+            console.warn('Error registrando sesión de inicio:', err.detail || err.message);
+            return;
+        }
+        const data = await res.json();
+        console.log('Sesión registrada:', data);
     } catch (err) {
-        console.warn('No se pudo registrar sesión:', err);
+        console.warn('Error en solicitud de sesión de inicio:', err);
     }
 }
 
 async function registrarSesionCierre() {
     if (!getToken()) return;
     try {
-        await fetch(`${ADMIN_API}/sesion/cierre`, {
+        const res = await fetch(`${ADMIN_API}/sesion/cierre`, {
             method: 'POST',
             headers: headersAuth()
         });
+        if (!res.ok) {
+            const err = await res.json();
+            console.warn('Error registrando sesión de cierre:', err.detail || err.message);
+            return;
+        }
+        const data = await res.json();
+        console.log('Sesión cerrada:', data);
     } catch (err) {
-        console.warn('No se pudo cerrar sesión:', err);
+        console.warn('Error en solicitud de sesión de cierre:', err);
     }
 }
 

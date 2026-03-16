@@ -334,6 +334,31 @@ body {
     font-size: 0.875rem;
 }
 
+.btn-activar {
+    background: #00695c;
+    color: var(--white);
+}
+
+.btn-desactivar {
+    background: #ff9800;
+    color: var(--white);
+}
+
+.btn-reenviar {
+    background: #0277bd;
+    color: var(--white);
+}
+
+.btn-leido {
+    background: #607d8b;
+    color: var(--white);
+}
+
+.btn-no-leido {
+    background: #1976d2;
+    color: var(--white);
+}
+
 /* Results Section */
 .results-section {
     background: var(--white);

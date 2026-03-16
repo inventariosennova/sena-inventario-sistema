@@ -114,13 +114,17 @@ async def create_activo(
             url = await subir_imagen_cloudinary(imagen)
             imagen_urls.append(url)
 
+    # Normalizar campos para evitar duplicados (espacios extra, mayúsculas)
+    cuentadante_norm = " ".join(cuentadante.strip().split()) if cuentadante else cuentadante
+    ubicacion_norm = " ".join(ubicacion.strip().split()) if ubicacion else ubicacion
+
     nuevo_activo = Activo(
         placa=placa,
         descripcion=descripcion,
         modelo=modelo,
-        responsable=cuentadante,
+        responsable=cuentadante_norm,
         cedula_responsable=cedula_responsable,
-        ubicacion=ubicacion,
+        ubicacion=ubicacion_norm,
         imagenes=imagen_urls
     )
 
@@ -131,9 +135,11 @@ async def create_activo(
     historial = HistorialCambio(
         activo_id=nuevo_activo.id,
         placa=placa,
-        responsable=cuentadante,
+        responsable=cuentadante_norm,
+        usuario_email=usuario.get('email'),
+        usuario_nombre=usuario.get('nombre'),
         accion="creado",
-        descripcion_cambio=f"Creación del activo con placa {placa} por {usuario['nombre']}"
+        descripcion_cambio=f"Creación del activo con placa {placa} por {usuario.get('nombre')}"
     )
     db.add(historial)
     db.commit()
@@ -163,9 +169,12 @@ async def update_activo(
     if placa:               activo.placa = placa
     if descripcion:         activo.descripcion = descripcion
     if modelo:              activo.modelo = modelo
-    if cuentadante:         activo.responsable = cuentadante
-    if cedula_responsable:  activo.cedula_responsable = cedula_responsable
-    if ubicacion:           activo.ubicacion = ubicacion
+    if cuentadante:
+        activo.responsable = " ".join(cuentadante.strip().split())
+    if cedula_responsable:
+        activo.cedula_responsable = cedula_responsable
+    if ubicacion:
+        activo.ubicacion = " ".join(ubicacion.strip().split())
 
     if imagenes_existentes is not None:
         try:
@@ -192,8 +201,10 @@ async def update_activo(
         activo_id=activo.id,
         placa=activo.placa,
         responsable=activo.responsable,
+        usuario_email=usuario.get('email'),
+        usuario_nombre=usuario.get('nombre'),
         accion="actualizado",
-        descripcion_cambio=f"Actualización por {usuario['nombre']}"
+        descripcion_cambio=f"Actualización por {usuario.get('nombre')}"
     )
     db.add(historial)
     db.commit()
@@ -274,8 +285,10 @@ async def delete_activo(
         activo_id=activo.id,
         placa=activo.placa,
         responsable=activo.responsable,
+        usuario_email=usuario.get('email'),
+        usuario_nombre=usuario.get('nombre'),
         accion="eliminado",
-        descripcion_cambio=f"Eliminación por admin: {usuario['nombre']}"
+        descripcion_cambio=f"Eliminación por admin: {usuario.get('nombre')}"
     )
     db.add(historial)
     db.delete(activo)

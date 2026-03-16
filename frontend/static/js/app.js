@@ -519,17 +519,31 @@ async function verActivo(id) {
 
 
 // =============================================
+// UTILITARIOS (normalización)
+// =============================================
+function normalizeStringValue(val) {
+    if (!val) return val;
+    return val.toString().trim().replace(/\s+/g, ' ');
+}
+
+
+// =============================================
 // CUENTADANTES Y UBICACIONES
 // =============================================
 async function cargarCuentadantes() {
     try {
         const response = await fetch(`${API_URL}/activos?limit=1000`);
         const data     = await response.json();
-        const cuentadantes = [...new Set(data.activos.map(a => a.responsable).filter(Boolean))];
+            const map = new Map();
+        data.activos.forEach(a => {
+            if (!a.responsable) return;
+            const norm = normalizeStringValue(a.responsable);
+            if (!map.has(norm)) map.set(norm, a.responsable);
+        });
         const select   = document.getElementById('searchResponsable');
-        cuentadantes.forEach(c => {
+        map.forEach((orig) => {
             const option = document.createElement('option');
-            option.value = c; option.textContent = c;
+            option.value = orig; option.textContent = orig;
             select.appendChild(option);
         });
     } catch (error) { console.error('Error cargando cuentadantes:', error); }
@@ -540,11 +554,16 @@ async function cargarUbicaciones() {
     try {
         const response = await fetch(`${API_URL}/activos?limit=1000`);
         const data     = await response.json();
-        const ubicaciones = [...new Set(data.activos.map(a => a.ubicacion).filter(Boolean))];
+        const map = new Map();
+        data.activos.forEach(a => {
+            if (!a.ubicacion) return;
+            const norm = normalizeStringValue(a.ubicacion);
+            if (!map.has(norm)) map.set(norm, a.ubicacion);
+        });
         const select   = document.getElementById('searchUbicacion');
-        ubicaciones.forEach(ubi => {
+        map.forEach((orig) => {
             const option = document.createElement('option');
-            option.value = ubi; option.textContent = ubi;
+            option.value = orig; option.textContent = orig;
             select.appendChild(option);
         });
     } catch (error) { console.error('Error cargando ubicaciones:', error); }
@@ -844,13 +863,13 @@ async function cargarInvitacionesAdmin() {
             const textColor = inv.usuario_activo === true ? '#155724' : inv.usuario_activo === false ? '#721c24' : '#856404';
             const acciones = [];
             if (inv.usuario_activo === false) {
-                acciones.push(`<button class="btn btn-success" style="height:30px;padding:6px 8px;font-size:13px;" onclick="activarUsuario('${inv.email.replace(/'/g, "\\'")}')" title="Activar usuario"><i class="fas fa-user-check"></i></button>`);
+                acciones.push(`<button class="btn btn-activar" style="height:30px;padding:6px 8px;font-size:13px;" onclick="activarUsuario('${inv.email.replace(/'/g, "\\'")}')" title="Activar usuario"><i class="fas fa-user-check"></i></button>`);
             }
             if (inv.usuario_activo === true) {
-                acciones.push(`<button class="btn btn-warning" style="height:30px;padding:6px 8px;font-size:13px;" onclick="desactivarUsuario('${inv.email.replace(/'/g, "\\'")}')" title="Desactivar usuario"><i class="fas fa-user-times"></i></button>`);
+                acciones.push(`<button class="btn btn-desactivar" style="height:30px;padding:6px 8px;font-size:13px;" onclick="desactivarUsuario('${inv.email.replace(/'/g, "\\'")}')" title="Desactivar usuario"><i class="fas fa-user-times"></i></button>`);
             }
-            acciones.push(`<button class="btn btn-danger" style="height:30px;padding:6px 8px;font-size:13px;" onclick="eliminarUsuario('${inv.email.replace(/'/g, "\\'")}')" title="Eliminar usuario"><i class="fas fa-user-slash"></i></button>`);
-            acciones.push(`<button class="btn btn-info" style="height:30px;padding:6px 8px;font-size:13px;" onclick="reenviarInvitacion('${inv.email.replace(/'/g, "\\'")}', '${(inv.nombre || '').replace(/'/g, "\\'")}')" title="Reenviar invitación"><i class="fas fa-envelope"></i></button>`);
+            acciones.push(`<button class="btn btn-eliminar" style="height:30px;padding:6px 8px;font-size:13px;" onclick="eliminarUsuario('${inv.email.replace(/'/g, "\\'")}')" title="Eliminar usuario"><i class="fas fa-user-slash"></i></button>`);
+            acciones.push(`<button class="btn btn-reenviar" style="height:30px;padding:6px 8px;font-size:13px;" onclick="reenviarInvitacion('${inv.email.replace(/'/g, "\\'")}', '${(inv.nombre || '').replace(/'/g, "\\'")}')" title="Reenviar invitación"><i class="fas fa-envelope"></i></button>`);
             return `
                 <tr>
                     <td>${inv.nombre || ''}</td>
@@ -979,14 +998,17 @@ async function cargarHistorialCompleto() {
         if (!Array.isArray(data) || data.length === 0) {
             cont.innerHTML = '<p style="color:#999;">No hay historial aún.</p>'; return;
         }
-        const filas = data.map(h => `
+        const filas = data.map(h => {
+            const usuarioActor = h.usuario_nombre || h.usuario_email || h.responsable || 'N/A';
+            return `
             <tr>
                 <td><strong>${h.placa || 'N/A'}</strong></td>
-                <td>${h.responsable}</td>
+                <td>${usuarioActor}</td>
                 <td><span style="background:#e7f1ff;color:#0066cc;padding:4px 8px;border-radius:4px;font-size:12px;">${h.accion}</span></td>
                 <td>${h.descripcion_cambio.substring(0, 60)}...</td>
                 <td>${h.fecha_cambio ? new Date(h.fecha_cambio).toLocaleString('es-CO') : ''}</td>
-            </tr>`).join('');
+            </tr>`;
+        }).join('');
         cont.innerHTML = `
             <div class="table-container">
                 <table class="inventory-table">
@@ -1097,14 +1119,19 @@ async function cargarNotificacionesAdmin() {
             const colorTipo = n.tipo === 'sesion' ? '#d4edda' : n.tipo === 'cambio' ? '#e7f1ff' : n.tipo === 'alerta' ? '#fff3cd' : '#f0f0f0';
             const textColor = n.tipo === 'sesion' ? '#155724' : n.tipo === 'cambio' ? '#0066cc' : n.tipo === 'alerta' ? '#856404' : '#333';
             const estado = n.leida ? '✓ Leída' : '○ No leída';
+            const btnClase = n.leida ? 'btn-leido' : 'btn-no-leido';
+            const btnTexto = n.leida ? 'Leída' : 'Marcar leída';
             return `
             <tr>
                 <td><span style="background:${colorTipo};color:${textColor};padding:2px 8px;border-radius:3px;font-size:11px;">${n.tipo}</span></td>
                 <td><strong>${n.titulo}</strong></td>
                 <td>${n.mensaje.substring(0, 40)}...</td>
                 <td style="font-size:11px;color:#666;">${n.fecha_creacion ? new Date(n.fecha_creacion).toLocaleString('es-CO') : ''}</td>
-                <td style="text-align:center;">${estado}</td>
-            </tr>`}).join('');
+                <td style="text-align:center;">
+                    <button class="btn ${btnClase}" style="padding:4px 8px;font-size:11px;" onclick="marcarNotificacionLeida(${n.id})">${btnTexto}</button>
+                </td>
+            </tr>`;
+        }).join('');
         cont.innerHTML = `
             <div class="table-container">
                 <table class="inventory-table" style="font-size:12px;">
@@ -1123,6 +1150,28 @@ async function cargarNotificacionesAdmin() {
     } catch (err) { cont.innerHTML = '<p style="color:#999;">Error cargando notificaciones.</p>'; }
 }
 
+async function marcarNotificacionLeida(id) {
+    try {
+        const res = await fetch(`${ADMIN_API}/notificaciones/${id}/marcar-leida`, {
+            method: 'POST',
+            headers: headersAuth()
+        });
+        if (!res.ok) {
+            const err = await res.json();
+            throw new Error(err.detail || 'Error marcando notificación');
+        }
+        await cargarNotificacionesAdmin();
+        await actualizarBadgeNotificaciones();
+        // Si el panel emergente está abierto, recargarlo para que la notificación desaparezca
+        const panel = document.getElementById('panelNotificaciones');
+        if (panel && panel.style.display === 'flex') {
+            abrirPanelNotificaciones();
+        }
+    } catch (err) {
+        mostrarError(err.message || 'Error marcando notificación');
+    }
+}
+
 
 // =============================================
 // PANEL NOTIFICACIONES (header popup)
@@ -1138,12 +1187,27 @@ async function abrirPanelNotificaciones() {
         if (!Array.isArray(data) || data.length === 0) {
             cont.innerHTML = '<p style="color:#999;text-align:center;">No hay notificaciones.</p>'; return;
         }
-        const listaNotif = data.slice(0, 10).map(n => `
-            <div style="padding:10px;border-bottom:1px solid #eee;cursor:pointer;hover:background:#f5f5f5;">
+
+        // Marcar todas las notificaciones como leídas cuando se abren
+        const noLeidas = data.filter(n => !n.leida);
+        await Promise.all(noLeidas.map(n => fetch(`${ADMIN_API}/notificaciones/${n.id}/marcar-leida`, {
+            method: 'POST',
+            headers: headersAuth()
+        })));
+        await actualizarBadgeNotificaciones();
+
+        // Refrescar data local para reflejar cambio de estado
+        const dataRefrescada = data.map(n => ({ ...n, leida: true }));
+
+        const listaNotif = dataRefrescada.slice(0, 10).map(n => {
+            const estilo = 'opacity:0.85;';
+            return `
+            <div onclick="marcarNotificacionLeida(${n.id})" style="padding:10px;border-bottom:1px solid #eee;cursor:pointer;${estilo}">
                 <div style="font-weight:bold;font-size:13px;color:#333;">${n.titulo}</div>
                 <small style="color:#666;">${n.mensaje.substring(0, 50)}...</small>
                 <div style="font-size:11px;color:#999;margin-top:4px;">${n.fecha_creacion ? new Date(n.fecha_creacion).toLocaleString('es-CO') : ''}</div>
-            </div>`).join('');
+            </div>`;
+        }).join('');
         cont.innerHTML = listaNotif;
     } catch (err) { cont.innerHTML = '<p style="color:#999;">Error cargando.</p>'; }
 }

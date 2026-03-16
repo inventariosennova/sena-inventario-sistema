@@ -66,17 +66,17 @@ def obtener_historial_completo(admin = Depends(requiere_admin)):
     try:
         with engine.begin() as conn:
             rows = conn.execute(text("""
-                SELECT 
+                SELECT
                     hc.id,
                     hc.activo_id,
                     hc.placa,
                     hc.responsable,
+                    hc.usuario_email,
+                    hc.usuario_nombre,
                     hc.accion,
                     hc.descripcion_cambio,
-                    hc.fecha_cambio,
-                    u.email AS usuario_email
+                    hc.fecha_cambio
                 FROM historial_cambios hc
-                LEFT JOIN usuarios u ON LOWER(u.nombre) = LOWER(hc.responsable)
                 ORDER BY hc.fecha_cambio DESC
                 LIMIT 500
             """)).mappings().all()

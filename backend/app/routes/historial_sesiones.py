@@ -1,7 +1,7 @@
 # backend/app/routes/historial_sesiones.py
 from fastapi import APIRouter, HTTPException, Depends, Request
 from sqlalchemy import text
-from app.routes.auth import requiere_admin, get_usuario_actual
+from app.routes.auth import requiere_admin, requiere_auth, get_usuario_actual
 from app.database.database import engine
 from pydantic import BaseModel
 from datetime import datetime

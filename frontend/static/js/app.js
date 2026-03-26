@@ -773,7 +773,7 @@ function renderizarHistorialPagina() {
                 <thead>
                     <tr>
                         <th>Placa</th><th>Cuentadante</th>
-                        <th>Acción</th><th>Descripción</th><th>Fecha</th>
+                        <th>Acción</th><th>Nombre</th><th>Fecha</th>
                     </tr>
                 </thead>
                 <tbody>${filas}</tbody>
@@ -1110,7 +1110,7 @@ async function cargarHistorialCompleto() {
                             <th>Placa</th>
                             <th>Usuario</th>
                             <th>Acción</th>
-                            <th>Descripción</th>
+                            <th>Nombre</th>
                             <th>Fecha y Hora</th>
                         </tr>
                     </thead>

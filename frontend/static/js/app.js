@@ -552,7 +552,7 @@ async function verActivo(id) {
         document.getElementById('detalleContent').innerHTML = `
             <div style="display:grid;gap:1.5rem;">
                 <div class="detail-row"><strong><i class="fas fa-barcode"></i> Placa:</strong> <span>${activo.placa}</span></div>
-                <div class="detail-row"><strong><i class="fas fa-align-left"></i> Descripción:</strong> <span>${activo.descripcion}</span></div>
+                <div class="detail-row"><strong><i class="fas fa-align-left"></i> Nombre:</strong> <span>${activo.descripcion}</span></div>
                 <div class="detail-row"><strong><i class="fas fa-cube"></i> Modelo:</strong> <span>${activo.modelo || 'N/A'}</span></div>
                 <div class="detail-row"><strong><i class="fas fa-user"></i> Cuentadante:</strong> <span>${activo.responsable}</span></div>
                 <div class="detail-row"><strong><i class="fas fa-id-card"></i> Cédula:</strong> <span>${activo.cedula_responsable || 'N/A'}</span></div>

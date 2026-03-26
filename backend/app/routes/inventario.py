@@ -298,7 +298,7 @@ async def exportar_excel(
         imagenes_str = "; ".join(a.imagenes) if a.imagenes else ""
         data.append({
             "Placa":           a.placa,
-            "Descripción":     a.descripcion,
+            "Nombre":          a.descripcion,
             "Modelo":          a.modelo,
             "Cuentadante":     a.responsable,
             "Cédula":          a.cedula_responsable,
